@@ -6,6 +6,7 @@
 from typing import Sequence
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
 from collections.abc import Callable
 from time import time
 
@@ -39,21 +40,107 @@ def isolator(data: pd.DataFrame) -> tuple:
 	return x, y
 
 @timeit
-def regression(method: Callable, train: pd.DataFrame, pred: pd.DataFrame, val: pd.DataFrame) -> np.ndarray:
+def regressions(methods: Sequence[Callable],
+				train: pd.DataFrame,
+				pred: pd.DataFrame,
+				val: pd.DataFrame) -> np.ndarray:
 	"""Calls the method on the data given and return outputs"""
-	object = method()
-	object.fit(train, pred)
-	return object.predict(val)
+	# for no re computations
+	scale = len(methods)
+	# Variable to keep outputs
+	predictions = np.array(
+		[
+			# Wait what is this isn't this supposed
+			# to be a simple structure for keeping
+			# the data?
+			# Well yeah I want to pre allocate all the memory
+			# so I use this format, I also want to use numpy
+			# arrays for two reasons 1. they are fast 2. the 
+			# output of the regression function is a numpy array
+			# So what is this segment benerath?
+			# it's me allocating # of samples in the validation set
+			# (or in other words number of rows in the val csv)
+			# positions in an array, shape gives (rows, cols)
+			# so shape[0] = rows
+			np.zeros(
+				val.shape[0]
+			)
+		] * scale
+	)
+	for index, model in enumerate(methods):
+		object = model()
+		object.fit(train, pred)
+		predictions[index] = object.predict(val)
+	return predictions
 
 @timeit
-def applyMetrics(metrics: Sequence[Callable], truth: np.ndarray, data: np.ndarray) -> np.ndarray:
+def applyMetrics(metrics: Sequence[Callable],
+				 options: Sequence[Callable],
+				 truth: np.ndarray,
+				 data: np.ndarray) -> np.ndarray:
 	"""Applies all the given metrics to the data assuming as ground truth the truth given"""
 	# Note that the function takes input as numpy array and not a dataframe which is why we convert the input in the notebook in the ()'s of the function
-	# Holder of the outputs
-	output = np.array([0] * len(metrics))
+	# The options are the regressors the metrics are the cost functions
+	# To not re compute this
+	holder = len(options)
+	# Variable to keep the metrics
+	output = np.array(
+		[
+			[
+				# See previous function for reasoning behind complexity here
+				np.array([0])
+			] * holder
+		] * len(metrics)
+	)
+	# So we will end up with the following
+	# [[option1, option2, option3, ...], # metric1
+	# [option1, option2, option3, ...], # metric2
+	# [...], # ...3
+	# [...], # ...4
+	# ...]
 	for i, metric in enumerate(metrics):
-		output[i] = metric(truth, data)
+		for index in range(holder):
+			output[i, index] = metric(truth, data[index])
 	return output
+
+@timeit
+def visualisePredictions(input: np.ndarray,
+						 methods: Sequence[Callable],
+						 verbose: bool = False) -> None:
+	"""Takes the output of the regressions function and displayes it with matplotlib"""
+	# I lean heavily on the documentation for this
+	# https://matplotlib.org/stable/gallery/statistics/boxplot.html#sphx-glr-gallery-statistics-boxplot-py
+	# Wonderful documentation honestly
+	holder = len(methods)
+	fig, ax = plt.subplots(nrows=1, ncols=holder, figsize=(3*holder, 3*holder), sharey = True)
+	for index in range(holder):
+		ax[index].boxplot(input[index], showmeans=True, meanline=True, notch=True)
+		ax[index].set_title(f"Method: {methods[index]().__class__.__name__}")
+	ax[0].set_ylabel('Predicted BMI')
+	plt.show()
+	if verbose:
+		print(input)
+
+@timeit
+def visualiseEvaluations(input: np.ndarray,
+						 methods: Sequence[Callable],
+						 metrics: Sequence[Callable],
+						 verbose: bool = False) -> None:
+	"""Takes the output of the applyMetrics function and displayes it with matplotlib"""
+	holder = len(methods)
+	temp = len(metrics)
+	fig, ax = plt.subplots(nrows=temp, ncols=1, figsize=(7, 8*holder), sharey = True)
+	for i, metric in enumerate(metrics): # Should iterate input col
+		for index in range(holder): # Should iterate input row
+			ax[i].scatter(index, input[i, index], label = f'{methods[index].__name__}')
+			ax[i].set_title(f"Metric: {metrics[i].__name__}")
+			ax[i].legend()
+			ax[i].grid()
+			ax[i].set_ylabel(f'{metrics[i].__name__} Value')
+			ax[i].set_xlabel('Method')
+	plt.show()
+	if verbose:
+		print(input)
 
 def main():
 	"""Checks that things work"""
