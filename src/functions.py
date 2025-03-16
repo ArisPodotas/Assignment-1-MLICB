@@ -4,21 +4,26 @@
 # really like small simple variable names (you can probably tell)
 
 from typing import Sequence
+from numpy._typing import _UnknownType
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from collections.abc import Callable
 from time import time
+from sklearn.utils import resample
+from typing import Any
+from tqdm import tqdm
 
 def timeit(func: Callable) -> Callable:
 	"""Prints the time a function took to execute"""
 	# This is my favorite functions and if you look at my other repositories on github it becomes quite obvious
-	def wrapper(*args, **kwargs):
+	def wrapper(*args, showTime: bool = True, **kwargs):
 		start= time()
 		result = func(*args, **kwargs)
 		end = time()
 		elapsed = end - start
-		print(f"Function '{func.__name__}' executed in {elapsed:.4f} seconds")
+		if showTime:
+			print(f"Function '{func.__name__}' executed in {elapsed:.4f} seconds")
 		return result
 	return wrapper
 
@@ -133,7 +138,7 @@ def visualiseEvaluations(input: np.ndarray,
 	for i, metric in enumerate(metrics): # Should iterate input col
 		for index in range(holder): # Should iterate input row
 			ax[i].scatter(index, input[i, index], label = f'{methods[index].__name__}')
-			ax[i].set_title(f"Metric: {metrics[i].__name__}")
+			ax[i].set_title(f"Metric: {metrics[i].__name__}") # Funciton are first class objects in python so __name__ just returns the function name string
 			ax[i].legend()
 			ax[i].grid()
 			ax[i].set_ylabel(f'{metrics[i].__name__} Value')
@@ -142,11 +147,93 @@ def visualiseEvaluations(input: np.ndarray,
 	if verbose:
 		print(input)
 
+@timeit
+def baseline(train: pd.DataFrame,
+			 val: pd.DataFrame,
+			 methods: Sequence[Callable],
+			 metrics: Sequence[Callable],
+			 plot: bool = False,
+			 verbose: bool = False) -> tuple[np.ndarray, np.ndarray]:
+	"""Implements the preceding functions to run the entire pipline for the baseline models"""
+	predictions = regressions(methods, train.drop(columns = ['BMI']), train['BMI'], val.drop(columns = ['BMI']))
+	scores = applyMetrics(metrics, methods, val['BMI'], predictions)
+	if plot:
+		visualisePredictions(predictions, methods, verbose = verbose)
+		visualiseEvaluations(scores, methods, metrics, verbose = verbose)
+	return predictions, scores
+
+@timeit
+def fitting(methods: Sequence[Callable],
+			train: pd.DataFrame,
+			pred: pd.DataFrame) -> list:
+	"""The purpose of this function is to return the model objects form sci kit learn after the fit happens"""
+	# I made this function so that I don't re train the models for each loop of the bootstrap
+	output = [0] * len(methods)
+	for index, model in enumerate(methods):
+		object = model()
+		object.fit(train, pred)
+		output[index] = object
+	return output
+
+@timeit
+def useFitModels(fitMethods: Sequence[Any], val: pd.DataFrame) -> np.ndarray:
+	"""This function pairs with fitting to not have to call the .fit() for each iteration of a bootstrap"""
+	# The type hint needs any since callable is a function and the .predict is not a function method
+	scale = len(fitMethods)
+	# Check the regression funtion for why this data structure
+	predictions = np.array(
+		[
+			np.zeros(
+				val.shape[0]
+			)
+		] * scale
+	)
+	for index, model in enumerate(fitMethods):
+		predictions[index] = model.predict(val)
+	return predictions
+
+@timeit
+def bootstrapBaseline(n: int,
+					  train: pd.DataFrame, # There was a reason I didn't use keyword arguments
+					  val: pd.DataFrame, # I can't remember why
+					  methods: Sequence[Callable],
+					  metrics: Sequence[Callable],
+					  plot: bool = False,
+					  verbose: bool = False) -> tuple:
+	"""Runs the baseline functions multiple times storing outputs"""
+	# The fitting and the useFitModels functions might seem redundant
+	# The thing is that the bootstrap function has no intention of trainin
+	# a function that does a loop over the baseline function would train the models each time its called
+	# This function trains once and uses the same trained object to do the predictions
+	# For this task the regressions function and other could not be used since
+	# they have a clear purpose and that does not involve returning the sci kit learn objects
+	# So to not overload those function we defined two other ones
+	# 
+	# This function when you put the fitting inside the loop for 1000 n takes 55 seconds
+	# The way it is not takes about 14 seconds
+	# I am very proud
+	predictions = [0] * n
+	scores = [0] * n
+	fitModels = fitting(methods, train.drop(columns = ['BMI']), train['BMI'], showTime = False)
+	for i in tqdm(range(n)):
+		# Permuting data
+		permutation = resample(val.drop(columns = ['BMI']))
+		predictions[i] = useFitModels(fitModels, permutation, showTime = False)
+		scores[i] = applyMetrics(metrics, methods, val['BMI'], predictions[i], showTime = False)
+	if plot:
+		visualisePredictions(predictions, methods, verbose = verbose)
+		visualiseEvaluations(scores, methods, metrics, verbose = verbose)
+	return predictions, scores
+
+@timeit
+def showConfidence(preds: tuple) -> None:
+	"""Takes the output of bootstrapBaseline and plots it"""
+	# body
+	return None
+
 def main():
 	"""Checks that things work"""
-	dev = pd.read_csv('../data/development_final_data.csv')
-	devData, devMeta = dataSplit(dev)
-	train, preds = isolator(devData)
+	pass
 
 if __name__ == "__main__":
 	main()
