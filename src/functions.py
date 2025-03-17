@@ -121,6 +121,7 @@ def visualisePredictions(input: np.ndarray,
 	for index in range(holder):
 		ax[index].boxplot(input[index], showmeans=True, meanline=True, notch=True)
 		ax[index].set_title(f"Method: {methods[index]().__class__.__name__}")
+		ax[index].grid()
 	ax[0].set_ylabel('Predicted BMI')
 	plt.show()
 	if verbose:
@@ -135,7 +136,7 @@ def visualiseEvaluations(input: np.ndarray,
 	holder = len(methods)
 	temp = len(metrics)
 	fig, ax = plt.subplots(nrows=temp, ncols=1, figsize=(7, 8*holder), sharey = True)
-	for i, metric in enumerate(metrics): # Should iterate input col
+	for i in range(temp): # Should iterate input col
 		for index in range(holder): # Should iterate input row
 			ax[i].scatter(index, input[i, index], label = f'{methods[index].__name__}')
 			ax[i].set_title(f"Metric: {metrics[i].__name__}") # Funciton are first class objects in python so __name__ just returns the function name string
@@ -149,14 +150,16 @@ def visualiseEvaluations(input: np.ndarray,
 
 @timeit
 def baseline(train: pd.DataFrame,
+			 labels: pd.DataFrame,
 			 val: pd.DataFrame,
+			 truth: pd.DataFrame,
 			 methods: Sequence[Callable],
 			 metrics: Sequence[Callable],
 			 plot: bool = False,
 			 verbose: bool = False) -> tuple[np.ndarray, np.ndarray]:
 	"""Implements the preceding functions to run the entire pipline for the baseline models"""
-	predictions = regressions(methods, train.drop(columns = ['BMI']), train['BMI'], val.drop(columns = ['BMI']))
-	scores = applyMetrics(metrics, methods, val['BMI'], predictions)
+	predictions = regressions(methods, train, labels, val)
+	scores = applyMetrics(metrics, methods, truth, predictions)
 	if plot:
 		visualisePredictions(predictions, methods, verbose = verbose)
 		visualiseEvaluations(scores, methods, metrics, verbose = verbose)
@@ -195,7 +198,9 @@ def useFitModels(fitMethods: Sequence[Any], val: pd.DataFrame) -> np.ndarray:
 @timeit
 def bootstrapBaseline(n: int,
 					  train: pd.DataFrame, # There was a reason I didn't use keyword arguments
+					  labels: pd.DataFrame,
 					  val: pd.DataFrame, # I can't remember why
+					  true: pd.DataFrame,
 					  methods: Sequence[Callable],
 					  metrics: Sequence[Callable],
 					  plot: bool = False,
@@ -212,24 +217,75 @@ def bootstrapBaseline(n: int,
 	# This function when you put the fitting inside the loop for 1000 n takes 55 seconds
 	# The way it is not takes about 14 seconds
 	# I am very proud
-	predictions = [0] * n
-	scores = [0] * n
-	fitModels = fitting(methods, train.drop(columns = ['BMI']), train['BMI'], showTime = False)
+	holder = len(methods)
+	predictions = np.array(
+		[
+			np.array(
+				[
+					np.zeros(
+						val.shape[0]
+					)
+				] * holder
+			)
+		] * n
+	)
+	scores = np.array(
+		[
+			np.array(
+				[
+					[
+						# See previous function for reasoning behind complexity here
+						np.array([0])
+					] * holder
+				] * len(metrics)
+			)
+		] * n
+	)
+	fitModels = fitting(methods, train, labels, showTime = False)
 	for i in tqdm(range(n)):
 		# Permuting data
-		permutation = resample(val.drop(columns = ['BMI']))
+		permutation = resample(val)
 		predictions[i] = useFitModels(fitModels, permutation, showTime = False)
-		scores[i] = applyMetrics(metrics, methods, val['BMI'], predictions[i], showTime = False)
+		scores[i] = applyMetrics(metrics, methods, true, predictions[i], showTime = False)
 	if plot:
-		visualisePredictions(predictions, methods, verbose = verbose)
-		visualiseEvaluations(scores, methods, metrics, verbose = verbose)
+		showConfidence((predictions, scores), methods, metrics, verbose = False)
+	if verbose:
+		print(predictions[0:3, 0:10, :])
+		print(scores[0:3, 0:10, :])
 	return predictions, scores
 
 @timeit
-def showConfidence(preds: tuple) -> None:
+def showConfidence(preds: tuple,
+				   methods: Sequence[Callable],
+				   metrics: Sequence[Callable],
+				   verbose: bool = False) -> None:
 	"""Takes the output of bootstrapBaseline and plots it"""
-	# body
-	return None
+	predictions = preds[0]
+	scores = preds[1]
+	holder = len(methods)
+	# Predictions segment
+	fig, ax = plt.subplots(nrows=1, ncols=holder, figsize=(10*holder, 10*holder), sharey = True)
+	for index in range(holder):
+		ax[index].boxplot(predictions[:, index, :], showmeans=True, meanline=True, notch = True)
+		ax[index].set_title(f"Method: {methods[index]().__class__.__name__}")
+		ax[index].grid()
+	ax[0].set_ylabel('Predicted BMI')
+	plt.show()
+	if verbose:
+		print(predictions)
+	# Scores segment
+	temp = len(metrics)
+	fig, ax = plt.subplots(nrows=holder, ncols=temp, figsize=(6*holder, 4*temp), sharey = True)
+	for i in range(temp): # Should iterate input col
+		for index in range(holder): # Should iterate input row
+			ax[index, i].boxplot(scores[:, i, index, :], showmeans=True, meanline=True) # index, i is row, col in matplotlib
+			ax[index, i].set_title(f"Metric: {metrics[i].__name__}") # Funciton are first class objects in python so __name__ just returns the function name string
+			ax[index, i].grid()
+			ax[index, i].set_ylabel(f'{metrics[i].__name__} Value')
+			ax[index, i].set_xlabel(f'Method: {methods[index].__name__}')
+	plt.show()
+	if verbose:
+		print(scores)
 
 def main():
 	"""Checks that things work"""
