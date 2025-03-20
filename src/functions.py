@@ -6,6 +6,7 @@
 from typing import Sequence
 from numpy._typing import _UnknownType
 import pandas as pd
+import os
 import numpy as np
 import matplotlib.pyplot as plt
 from collections.abc import Callable
@@ -13,6 +14,9 @@ from time import time
 from sklearn.utils import resample
 from typing import Any
 from tqdm import tqdm
+from sklearn.model_selection import RepeatedKFold
+import joblib
+from sklearn.decomposition import PCA
 
 def timeit(func: Callable) -> Callable:
 	"""Prints the time a function took to execute"""
@@ -40,7 +44,7 @@ def dataSplit(dataframe: pd.DataFrame) -> tuple:
 @timeit
 def isolator(data: pd.DataFrame) -> tuple:
 	"""Isolates the x's and y's of the dataframe into different variables"""
-	x = data.iloc[:, 1:] # everything other than the BMI
+	x = data.drop(columns = ['BMI']) # everything other than the BMI
 	y = data['BMI']
 	return x, y
 
@@ -93,7 +97,7 @@ def applyMetrics(metrics: Sequence[Callable],
 		[
 			[
 				# See previous function for reasoning behind complexity here
-				np.array([0])
+				[0]
 			] * holder
 		] * len(metrics)
 	)
@@ -119,7 +123,7 @@ def visualisePredictions(input: np.ndarray,
 	holder = len(methods)
 	fig, ax = plt.subplots(nrows=1, ncols=holder, figsize=(3*holder, 3*holder), sharey = True)
 	for index in range(holder):
-		ax[index].boxplot(input[index], showmeans=True, meanline=True, notch=True)
+		ax[index].boxplot(input[index], showmeans=True, meanline=True, notch=True, sym = '.')
 		ax[index].set_title(f"Method: {methods[index]().__class__.__name__}")
 		ax[index].grid()
 	ax[0].set_ylabel('Predicted BMI')
@@ -196,56 +200,128 @@ def useFitModels(fitMethods: Sequence[Any], val: pd.DataFrame) -> np.ndarray:
 	return predictions
 
 @timeit
-def bootstrapBaseline(n: int,
-					  train: pd.DataFrame, # There was a reason I didn't use keyword arguments
-					  labels: pd.DataFrame,
+def bootstrapBoth(n: int,
+					  dev : pd.DataFrame, # There was a reason I didn't use keyword arguments
 					  val: pd.DataFrame, # I can't remember why
-					  true: pd.DataFrame,
 					  methods: Sequence[Callable],
 					  metrics: Sequence[Callable],
 					  plot: bool = False,
 					  verbose: bool = False) -> tuple:
-	"""Runs the baseline functions multiple times storing outputs"""
-	# The fitting and the useFitModels functions might seem redundant
-	# The thing is that the bootstrap function has no intention of trainin
-	# a function that does a loop over the baseline function would train the models each time its called
-	# This function trains once and uses the same trained object to do the predictions
-	# For this task the regressions function and other could not be used since
-	# they have a clear purpose and that does not involve returning the sci kit learn objects
-	# So to not overload those function we defined two other ones
-	# 
-	# This function when you put the fitting inside the loop for 1000 n takes 55 seconds
-	# The way it is not takes about 14 seconds
-	# I am very proud
+	"""Runs the baseline functions multiple times storing outputs and changing both the training and validation set"""
 	holder = len(methods)
 	predictions = np.array(
 		[
-			np.array(
-				[
-					np.zeros(
-						val.shape[0]
-					)
-				] * holder
-			)
+			[
+				np.zeros(
+					val.shape[0]
+				)
+			] * holder
 		] * n
 	)
 	scores = np.array(
 		[
-			np.array(
+			[
 				[
-					[
-						# See previous function for reasoning behind complexity here
-						np.array([0])
-					] * holder
-				] * len(metrics)
-			)
+					# See previous function for reasoning behind complexity here
+					[0]
+				] * holder
+			] * len(metrics)
 		] * n
 	)
+	for i in tqdm(range(n)):
+		# Permuting data
+		train, labels = isolator(resample(dev), showTime = False)
+		fitModels = fitting(methods, train, labels, showTime = False)
+		permutation = resample(val, random_state = 42)
+		validation, true = isolator(permutation, showTime = False)
+		predictions[i] = useFitModels(fitModels, validation, showTime = False)
+		scores[i] = applyMetrics(metrics, methods, true, predictions[i], showTime = False)
+	if plot:
+		showConfidence((predictions, scores), methods, metrics, verbose = False)
+	if verbose:
+		print(predictions[0:3, 0:10, :])
+		print(scores[0:3, 0:10, :])
+	return predictions, scores
+
+@timeit
+def bootstrapVal(n: int,
+				 dev : pd.DataFrame, # There was a reason I didn't use keyword arguments
+				 val: pd.DataFrame, # I can't remember why
+				 methods: Sequence[Callable],
+				 metrics: Sequence[Callable],
+				 plot: bool = False,
+				 verbose: bool = False) -> tuple:
+	"""Runs the baseline functions multiple times storing outputs and changing the validation set"""
+	holder = len(methods)
+	predictions = np.array(
+		[
+			[
+				np.zeros(
+					val.shape[0]
+				)
+			] * holder
+		] * n
+	)
+	scores = np.array(
+		[
+			[
+				[
+					# See previous function for reasoning behind complexity here
+					[0]
+				] * holder
+			] * len(metrics)
+		] * n
+	)
+	train, labels = isolator(dev, showTime = False)
 	fitModels = fitting(methods, train, labels, showTime = False)
 	for i in tqdm(range(n)):
 		# Permuting data
-		permutation = resample(val)
-		predictions[i] = useFitModels(fitModels, permutation, showTime = False)
+		permutation = resample(val, random_state = 42)
+		validation, true = isolator(permutation, showTime = False)
+		predictions[i] = useFitModels(fitModels, validation, showTime = False)
+		scores[i] = applyMetrics(metrics, methods, true, predictions[i], showTime = False)
+	if plot:
+		showConfidence((predictions, scores), methods, metrics, verbose = False)
+	if verbose:
+		print(predictions[0:3, 0:10, :])
+		print(scores[0:3, 0:10, :])
+	return predictions, scores
+
+@timeit
+def bootstrapDev(n: int,
+				  dev : pd.DataFrame, # There was a reason I didn't use keyword arguments
+				  val: pd.DataFrame, # I can't remember why
+				  methods: Sequence[Callable],
+				  metrics: Sequence[Callable],
+				  plot: bool = False,
+				  verbose: bool = False) -> tuple:
+	"""Runs the baseline functions multiple times storing outputs and changing the development set"""
+	holder = len(methods)
+	predictions = np.array(
+		[
+			[
+				np.zeros(
+					val.shape[0]
+				)
+			] * holder
+		] * n
+	)
+	scores = np.array(
+		[
+			[
+				[
+					# See previous function for reasoning behind complexity here
+					[0]
+				] * holder
+			] * len(metrics)
+		] * n
+	)
+	validation, true = isolator(val, showTime = False)
+	for i in tqdm(range(n)):
+		# Permuting data
+		train, labels = isolator(resample(dev), showTime = False)
+		fitModels = fitting(methods, train, labels, showTime = False)
+		predictions[i] = useFitModels(fitModels, validation, showTime = False)
 		scores[i] = applyMetrics(metrics, methods, true, predictions[i], showTime = False)
 	if plot:
 		showConfidence((predictions, scores), methods, metrics, verbose = False)
@@ -264,11 +340,11 @@ def showConfidence(preds: tuple,
 	scores = preds[1]
 	holder = len(methods)
 	# Predictions segment
-	fig, ax = plt.subplots(nrows=1, ncols=holder, figsize=(10*holder, 10*holder), sharey = True)
+	fig, ax = plt.subplots(nrows=1, ncols=holder, figsize=(5*holder, 7*holder), sharey = True)
 	for index in range(holder):
-		ax[index].boxplot(predictions[:, index, :], showmeans=True, meanline=True, notch = True)
+		ax[index].boxplot(predictions[:, index, :], showmeans=True, meanline=True, notch = True, sym = '.')
 		ax[index].set_title(f"Method: {methods[index]().__class__.__name__}")
-		ax[index].grid()
+		ax[index].grid(axis = 'y')
 	ax[0].set_ylabel('Predicted BMI')
 	plt.show()
 	if verbose:
@@ -278,7 +354,7 @@ def showConfidence(preds: tuple,
 	fig, ax = plt.subplots(nrows=holder, ncols=temp, figsize=(6*holder, 4*temp), sharey = True)
 	for i in range(temp): # Should iterate input col
 		for index in range(holder): # Should iterate input row
-			ax[index, i].boxplot(scores[:, i, index, :], showmeans=True, meanline=True) # index, i is row, col in matplotlib
+			ax[index, i].boxplot(scores[:, i, index, :], showmeans=True, meanline=True, sym = '.') # index, i is row, col in matplotlib
 			ax[index, i].set_title(f"Metric: {metrics[i].__name__}") # Funciton are first class objects in python so __name__ just returns the function name string
 			ax[index, i].grid()
 			ax[index, i].set_ylabel(f'{metrics[i].__name__} Value')
@@ -286,6 +362,83 @@ def showConfidence(preds: tuple,
 	plt.show()
 	if verbose:
 		print(scores)
+
+@timeit
+def applyKfold(train: pd.DataFrame,
+			   labels: pd.DataFrame,
+			   methods: Sequence[Callable],
+			   metrics: Sequence[Callable],
+			   splits: int,
+			   iterations: int,
+			   plot: bool = True,
+			   verbose: bool = False) -> np.ndarray:
+	"""This function takes the baseline and applies a k fold cross validation protocol to it"""
+	holder = len(methods)
+	# I want a data structure that can hold the output of apply Metrics for each fold
+	scores = np.array(
+		[
+			[
+				[
+					# See previous function for reasoning behind complexity here
+					[0]
+				] * holder
+			] * len(metrics)
+		] * splits * iterations
+	)
+	kf = RepeatedKFold(n_splits= splits, n_repeats=iterations, random_state = 42) # I rely on the documentation heavily here
+	# https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.RepeatedKFold.html#sklearn.model_selection.RepeatedKFold
+	for index, holder in tqdm(enumerate(kf.split(train))):
+		x = train.iloc[holder[0]]
+		val = train.iloc[holder[1]]
+		preds = labels.iloc[holder[0]]
+		models = fitting(methods, x, preds, showTime = False)
+		results = useFitModels(models, val, showTime = False)
+		scores[index - 1] = applyMetrics(metrics, methods, labels.iloc[holder[1]], results, showTime = False)
+	if plot:
+		holder = len(methods)
+		temp = len(metrics)
+		fig, ax = plt.subplots(nrows=holder, ncols=temp, figsize=(6*holder, 4*temp), sharey = True)
+		for i in range(temp): # Should iterate input col
+			for index in range(holder): # Should iterate input row
+				ax[index, i].boxplot(scores[:, i, index, :], showmeans=True, meanline=True, sym = '.') # index, i is row, col in matplotlib
+				ax[index, i].set_title(f"Metric: {metrics[i].__name__}") # Funciton are first class objects in python so __name__ just returns the function name string
+				ax[index, i].grid()
+				ax[index, i].set_ylabel(f'{metrics[i].__name__} Value')
+				ax[index, i].set_xlabel(f'Method: {methods[index].__name__}')
+		plt.show()
+	if verbose:
+		print(scores[0:3, 0:3, 0:3, 0:3])
+	return scores
+
+@timeit
+def saveModels(models: list, folder: os.PathLike, identifier: str) -> None:
+	"""Saves all models in folder with their name and a unique identifier"""
+	os.makedirs(folder, exist_ok = True)
+	for model in models:
+		joblib.dump(model, f"{folder}{model.__class__.__name__}_{identifier}.pkl")
+
+@timeit
+def applyPca(data: pd.DataFrame, plot: bool = True) -> PCA:
+	"""Plots the explain values for each feature"""
+	# I notmalize the blue curve to the red one so that both are visible in detail
+	pca = PCA()
+	pca.fit(data)
+	if plot:
+		plt.plot(range(1, len(data.columns) + 1), pca.explained_variance_ratio_, color = 'red', label = 'Raw variance')
+		plt.plot(range(1, len(data.columns) + 1), [0.06 * sum(pca.explained_variance_ratio_[0:i]) for i in range(len(data.columns))], color = 'blue', label = 'Cummulative variance')
+		plt.grid()
+		plt.legend()
+		plt.title('Explain (%) of principal components')
+		plt.xlabel('Principal component')
+		plt.ylabel('Explained variance')
+		plt.show()
+	return pca.transform(data)
+
+@timeit
+def fname(arg: type) -> None:
+	"""doc"""
+	# body
+	return None
 
 def main():
 	"""Checks that things work"""
