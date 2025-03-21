@@ -4,7 +4,6 @@
 # really like small simple variable names (you can probably tell)
 
 from typing import Sequence
-from numpy._typing import _UnknownType
 import pandas as pd
 import os
 import numpy as np
@@ -17,6 +16,8 @@ from tqdm import tqdm
 from sklearn.model_selection import RepeatedKFold
 import joblib
 from sklearn.decomposition import PCA
+from mpl_toolkits.mplot3d import Axes3D
+
 
 def timeit(func: Callable) -> Callable:
 	"""Prints the time a function took to execute"""
@@ -418,27 +419,125 @@ def saveModels(models: list, folder: os.PathLike, identifier: str) -> None:
 		joblib.dump(model, f"{folder}{model.__class__.__name__}_{identifier}.pkl")
 
 @timeit
-def applyPca(data: pd.DataFrame, plot: bool = True) -> PCA:
-	"""Plots the explain values for each feature"""
+def searchPca(data: pd.DataFrame) -> None:
+	"""Calculates and plots the explain values for each feature"""
 	# I notmalize the blue curve to the red one so that both are visible in detail
 	pca = PCA()
 	pca.fit(data)
-	if plot:
-		plt.plot(range(1, len(data.columns) + 1), pca.explained_variance_ratio_, color = 'red', label = 'Raw variance')
-		plt.plot(range(1, len(data.columns) + 1), [0.06 * sum(pca.explained_variance_ratio_[0:i]) for i in range(len(data.columns))], color = 'blue', label = 'Cummulative variance')
-		plt.grid()
-		plt.legend()
-		plt.title('Explain (%) of principal components')
-		plt.xlabel('Principal component')
-		plt.ylabel('Explained variance')
-		plt.show()
-	return pca.transform(data)
+	plt.plot(range(1, len(data.columns) + 1), pca.explained_variance_ratio_, color = 'red', label = 'Raw variance')
+	plt.plot(range(1, len(data.columns) + 1), [0.06 * sum(pca.explained_variance_ratio_[0:i]) for i in range(len(data.columns))], color = 'blue', label = 'Cummulative variance')
+	plt.grid()
+	plt.legend()
+	plt.title('Explain (%) of principal components')
+	plt.xlabel('Principal component')
+	plt.ylabel('Explained variance')
+	plt.show()
 
 @timeit
-def fname(arg: type) -> None:
-	"""doc"""
-	# body
+def fitPca(data: pd.DataFrame, n: int | float) -> PCA:
+	"""Fits the pca and returns the object"""
+	return PCA(n_components = n).fit(data)
+
+@timeit
+def applyPca(data: pd.DataFrame, pca: PCA) -> pd.DataFrame:
+	"""Returns the dataframe with the transformation to n components"""
+	return pd.DataFrame(pca.fit_transform(data))
+
+@timeit
+def upperTriangle(matrix: np.ndarray) -> tuple[list, list]:
+	"""This function is to return the two lists of indecies to use to plot a matrix"""
+	# I need two arrays, one for redundant values and one for non redundant ones
+	# Since i need something like
+	# 1 - 1
+	# 2 - 1
+	# 2 - 2
+	# 3 - 1
+	# 3 - 2
+	# ...
+	width = len(matrix) - 1
+	height = width
+	volume = int((width) * (height) / 2) # of a triangle (technically an area)
+	redundant = [0] * volume
+	serial = [0] * volume
+	holder = 0
+	for i in range(1, len(matrix) - 1): # This one starts at 1 since the 0 index is on the diagonal I guess we could leave it and it would skip it
+		for j in range(0, len(matrix) - 1):
+			if i > j:
+				holder += 1
+				redundant[holder] = i
+				serial[holder] = j
+			else:
+				continue
+			# Note
+			# There is a way to make this faster I know of, I simply dont know if I'll go through the trouble of implementing it that way
+			# since this is already fast enough so this note is in case I don't. If i allocated all the memory in the list's before hand and 
+			# simply assign i and j instead of appending it would be faster. The syntax would look like redundant = [0]* volume were volume wold need to be
+			# the number of elements in the final redundant list.
+			#
+			# I just got done implementing it, it's says the same time but it might still be faster (just not by alot).
+	return redundant, serial
+
+# I forgot why I added **kwargs but I don't want to break something again
+@timeit
+def correlation(dataframe: pd.DataFrame, plot: bool = True) -> pd.DataFrame:
+	"""This function will take the correlation matrix of the dataframe and make a scatter plot for it (col 1 index, col 2 index, corr)"""
+	table = dataframe.corr() # There used to be an iloc here in the other notebook here all features are number however
+	# We only need everything above the diagonal
+	rows, cols = upperTriangle(table.values)  # Originally solved inside this function now moved to the one above
+	if plot:
+		fig = plt.figure()
+		ax = plt.axes(projection = '3d')
+		# I'm going to multiply the corr() output by alot since I want to have the delta z visible on the plot outside of just the color heatmap
+		ax.scatter(rows, cols, 1000 * table.values[rows, cols], label = 'Pearson corr', c = table.values[rows, cols], cmap = 'YlOrBr')
+		plt.title(f"Correlations of the dataframe")
+		ax.set_xlabel(f"Col 1")
+		ax.set_ylabel(f"Col 2")
+		ax.set_zlabel("Pearson correlation of dataframe")
+		plt.grid()
+		plt.show()
+	return table
+
+@timeit
+def pearsonPrune(data: pd.DataFrame, cutoff: float | int) -> pd.DataFrame:
+	"""Removes entries in the dataframe that have correlation higher than cutoff"""
+	# I'm goingto removve the features from the end of the table since if I do it the other way
+	# I can run into an indexing error.
+	table = data.corr()
+	rows, cols = upperTriangle(table.values)
+	for row in rows:
+		for col in cols:
+			if table.values[row, col] >= cutoff:
+				data = data.drop(index = col, axis = 1)
+	return data
+
+# Unused it's just so simple it does not need to be a function
+@timeit
+def embed(data: pd.DataFrame, labels: pd.DataFrame) -> None:
+	"""Inserts the labels to the front of the data frame"""
+	# You might ask why I need this, well at the feature selection
+	# the selection happens wihtout the labes so I used the isolate function
+	# to get the split data into two dataframes, now the bootstrap funciton
+	# needs to get a dataframe with all of that data in one place to split
+	# it after the resampling each time.
 	return None
+
+# I will come back to this function when everything is done
+@timeit
+def compareMetrics(data: np.ndarray, compare: np.ndarray) -> np.ndarray:
+	"""Takes the output of compare metrics for two runs and outputs the comparison for all metrics just numerically"""
+	# Making an output that is the same as the metric lists
+	# change the options and metrics to sizes of the dim of the inputs
+	holder = len(options)
+	# Variable to keep the metrics
+	output = np.array(
+		[
+			[
+				# See previous function for reasoning behind complexity here
+				[0]
+			] * holder
+		] * len(metrics)
+	)
+	return output
 
 def main():
 	"""Checks that things work"""
