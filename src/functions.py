@@ -98,13 +98,13 @@ def applyMetrics(metrics: Sequence[Callable],
 		[
 			[
 				# See previous function for reasoning behind complexity here
-				[0]
+				[0] # Ill use this third dimension for the bootstrap later don't mind it now
 			] * holder
 		] * len(metrics)
 	)
 	# So we will end up with the following
-	# [[option1, option2, option3, ...], # metric1
-	# [option1, option2, option3, ...], # metric2
+	# [[[option1], [option2], [option3], ...], # metric1
+	# [[option1], [option2], [option3], ...], # metric2
 	# [...], # ...3
 	# [...], # ...4
 	# ...]
@@ -202,12 +202,12 @@ def useFitModels(fitMethods: Sequence[Any], val: pd.DataFrame) -> np.ndarray:
 
 @timeit
 def bootstrapBoth(n: int,
-					  dev : pd.DataFrame, # There was a reason I didn't use keyword arguments
-					  val: pd.DataFrame, # I can't remember why
-					  methods: Sequence[Callable],
-					  metrics: Sequence[Callable],
-					  plot: bool = False,
-					  verbose: bool = False) -> tuple:
+				  dev : pd.DataFrame, # There was a reason I didn't use keyword arguments
+				  val: pd.DataFrame, # I can't remember why
+				  methods: Sequence[Callable],
+				  metrics: Sequence[Callable],
+				  plot: bool = False,
+				  verbose: bool = False) -> tuple:
 	"""Runs the baseline functions multiple times storing outputs and changing both the training and validation set"""
 	holder = len(methods)
 	predictions = np.array(
@@ -477,7 +477,6 @@ def upperTriangle(matrix: np.ndarray) -> tuple[list, list]:
 			# I just got done implementing it, it's says the same time but it might still be faster (just not by alot).
 	return redundant, serial
 
-# I forgot why I added **kwargs but I don't want to break something again
 @timeit
 def correlation(dataframe: pd.DataFrame, plot: bool = True) -> pd.DataFrame:
 	"""This function will take the correlation matrix of the dataframe and make a scatter plot for it (col 1 index, col 2 index, corr)"""
@@ -510,34 +509,63 @@ def pearsonPrune(data: pd.DataFrame, cutoff: float | int) -> pd.DataFrame:
 				data = data.drop(index = col, axis = 1)
 	return data
 
-# Unused it's just so simple it does not need to be a function
-@timeit
-def embed(data: pd.DataFrame, labels: pd.DataFrame) -> None:
-	"""Inserts the labels to the front of the data frame"""
-	# You might ask why I need this, well at the feature selection
-	# the selection happens wihtout the labes so I used the isolate function
-	# to get the split data into two dataframes, now the bootstrap funciton
-	# needs to get a dataframe with all of that data in one place to split
-	# it after the resampling each time.
-	return None
-
-# I will come back to this function when everything is done
 @timeit
 def compareMetrics(data: np.ndarray, compare: np.ndarray) -> np.ndarray:
-	"""Takes the output of compare metrics for two runs and outputs the comparison for all metrics just numerically"""
+	"""Takes the output of applyMetrics for two runs and outputs the comparison for all metrics just numerically"""
+	shape = data.shape
 	# Making an output that is the same as the metric lists
-	# change the options and metrics to sizes of the dim of the inputs
-	holder = len(options)
 	# Variable to keep the metrics
-	output = np.array(
-		[
-			[
-				# See previous function for reasoning behind complexity here
-				[0]
-			] * holder
-		] * len(metrics)
-	)
+	output = data.copy()
+	for i in range(shape[0]): # metrics
+		for j in range(shape[1]): # methods
+			output[i, j, 0] = data[i, j, 0] - compare[i, j, 0]
 	return output
+
+@timeit
+def compareBootstrap(data: np.ndarray, compare: np.ndarray) -> tuple:
+	"""Takes the output of bootstrap for two runs and outputs the comparison for all metrics just numerically"""
+	# One can imagine an error because the two bootstraps have different sizes. I won't be fixing that.
+	dataShape = data[0].shape # (n, methods)
+	scoresShape = data[1].shape # (n, metrics, methods)
+	dataOutput = data[0].copy()
+	scoresOutput = data[1].copy()
+	# data section
+	# I don't really need this one but all the architecture is here so why not
+	for i in range(dataShape[0]): # n
+		for j in range(dataShape[1]): # methods
+			dataOutput[i, j, 0] = data[i, j, 0] - compare[i, j, 0]
+	# Scores section
+	for i in range(scoresShape[0]): # n
+		for j in range(scoresShape[1]): # metrics
+			scoresOutput[i, j, 0] = data[i, j, 0] - compare[i, j, 0]
+	return dataOutput, scoresOutput
+
+@timeit
+def compareKfold(data: np.ndarray, compare: np.ndarray) -> np.ndarray:
+	"""Takes the output of bootstrap for two runs and outputs the comparison for all metrics just numerically"""
+	# One can imagine an error because the two bootstraps have different sizes. I won't be fixing that.
+	shape = data.shape # (splits * iterations, metrics, methods)
+	output = data.copy()
+	for i in range(shape[0]): # splits * iterations
+		for j in range(shape[1]): # metrics
+			for k in range(shape[2]): # methods
+				output[i, j, k, 0] = data[i, j, k, 0] - compare[i, j, k, 0]
+	return output
+
+@timeit
+def visualiseComparedKfold(data: np.ndarray, methods: Sequence[Callable], metrics: Sequence[Callable]) -> None:
+	"""Plots the compareKfold function output"""
+	holder = len(methods)
+	temp = len(metrics)
+	fig, ax = plt.subplots(nrows=holder, ncols=temp, figsize=(6*holder, 4*temp), sharey = True)
+	for i in range(temp): # Should iterate input col
+		for index in range(holder): # Should iterate input row
+			ax[index, i].boxplot(data[:, i, index, :], showmeans=True, meanline=True, sym = '.') # index, i is row, col in matplotlib
+			ax[index, i].set_title(f"Metric: {metrics[i].__name__}") # Funciton are first class objects in python so __name__ just returns the function name string
+			ax[index, i].grid()
+			ax[index, i].set_ylabel(f'{metrics[i].__name__} Value')
+			ax[index, i].set_xlabel(f'Method: {methods[index].__name__}')
+	plt.show()
 
 def main():
 	"""Checks that things work"""
