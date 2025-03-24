@@ -20,6 +20,7 @@ import joblib
 from sklearn.decomposition import PCA
 from mpl_toolkits.mplot3d import Axes3D
 import optuna
+from sklearn.cluster import KMeans
 
 
 def timeit(func: Callable) -> Callable:
@@ -706,6 +707,15 @@ def optimizeNet(metric: Callable,
 	study = optuna.create_study()
 	study.optimize(objective, n_trials = trials)
 	return study.best_params
+
+@timeit
+def findClusters(data: pd.DataFrame, inits: int = 10, maxclust: int = 10) -> list:
+	"""Finds the number of clusters in the data by using k means with point representatives"""
+	output = [0] * maxclust
+	for n in range(maxclust):
+		holder = KMeans(n_clusters = n, n_init = inits, random_state = 42)
+		output[n] = holder.fit(data.values)
+	return output
 
 def main():
 	"""Checks that things work"""
