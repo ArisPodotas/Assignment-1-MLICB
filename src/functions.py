@@ -10,6 +10,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from collections.abc import Callable
 from time import time
+from sklearn.linear_model import BayesianRidge, ElasticNet
+from sklearn.svm import SVR
 from sklearn.utils import resample
 from typing import Any
 from tqdm import tqdm
@@ -17,6 +19,7 @@ from sklearn.model_selection import RepeatedKFold
 import joblib
 from sklearn.decomposition import PCA
 from mpl_toolkits.mplot3d import Axes3D
+import optuna
 
 
 def timeit(func: Callable) -> Callable:
@@ -53,7 +56,8 @@ def isolator(data: pd.DataFrame) -> tuple:
 def regressions(methods: Sequence[Callable],
 				train: pd.DataFrame,
 				pred: pd.DataFrame,
-				val: pd.DataFrame) -> np.ndarray:
+				val: pd.DataFrame,
+				arguments: list | None = None) -> np.ndarray:
 	"""Calls the method on the data given and return outputs"""
 	# for no re computations
 	scale = len(methods)
@@ -77,10 +81,18 @@ def regressions(methods: Sequence[Callable],
 			)
 		] * scale
 	)
-	for index, model in enumerate(methods):
-		object = model()
-		object.fit(train, pred)
-		predictions[index] = object.predict(val)
+	if arguments:
+		index = 0
+		for model, args in zip(methods, arguments):
+			object = model(**args)
+			object.fit(train,pred)
+			predictions[index] = object.predict(val)
+			index +=1
+	else:
+		for index, model in enumerate(methods):
+			object = model()
+			object.fit(train, pred)
+			predictions[index] = object.predict(val)
 	return predictions
 
 @timeit
@@ -173,14 +185,24 @@ def baseline(train: pd.DataFrame,
 @timeit
 def fitting(methods: Sequence[Callable],
 			train: pd.DataFrame,
-			pred: pd.DataFrame) -> list:
+			pred: pd.DataFrame,
+			arguments: list | None = None) -> list:
 	"""The purpose of this function is to return the model objects form sci kit learn after the fit happens"""
 	# I made this function so that I don't re train the models for each loop of the bootstrap
 	output = [0] * len(methods)
-	for index, model in enumerate(methods):
-		object = model()
-		object.fit(train, pred)
-		output[index] = object
+	if arguments:
+		index = 0
+		for model, args in zip(methods, arguments):
+			object = model(**args)
+			object.fit(train,pred)
+			output[index] = object
+			index += 1
+		del index
+	else:
+		for index, model in enumerate(methods):
+			object = model()
+			object.fit(train, pred)
+			output[index] = object
 	return output
 
 @timeit
@@ -206,6 +228,7 @@ def bootstrapBoth(n: int,
 				  val: pd.DataFrame, # I can't remember why
 				  methods: Sequence[Callable],
 				  metrics: Sequence[Callable],
+				  arguments: list | None = None,
 				  plot: bool = False,
 				  verbose: bool = False) -> tuple:
 	"""Runs the baseline functions multiple times storing outputs and changing both the training and validation set"""
@@ -232,7 +255,7 @@ def bootstrapBoth(n: int,
 	for i in tqdm(range(n)):
 		# Permuting data
 		train, labels = isolator(resample(dev), showTime = False)
-		fitModels = fitting(methods, train, labels, showTime = False)
+		fitModels = fitting(methods, train, labels, arguments = arguments, showTime = False)
 		permutation = resample(val, random_state = 42)
 		validation, true = isolator(permutation, showTime = False)
 		predictions[i] = useFitModels(fitModels, validation, showTime = False)
@@ -250,6 +273,7 @@ def bootstrapVal(n: int,
 				 val: pd.DataFrame, # I can't remember why
 				 methods: Sequence[Callable],
 				 metrics: Sequence[Callable],
+				 arguments: list | None = None,
 				 plot: bool = False,
 				 verbose: bool = False) -> tuple:
 	"""Runs the baseline functions multiple times storing outputs and changing the validation set"""
@@ -274,7 +298,7 @@ def bootstrapVal(n: int,
 		] * n
 	)
 	train, labels = isolator(dev, showTime = False)
-	fitModels = fitting(methods, train, labels, showTime = False)
+	fitModels = fitting(methods, train, labels, arguments = arguments, showTime = False)
 	for i in tqdm(range(n)):
 		# Permuting data
 		permutation = resample(val, random_state = 42)
@@ -294,6 +318,7 @@ def bootstrapDev(n: int,
 				  val: pd.DataFrame, # I can't remember why
 				  methods: Sequence[Callable],
 				  metrics: Sequence[Callable],
+				  arguments: list | None = None,
 				  plot: bool = False,
 				  verbose: bool = False) -> tuple:
 	"""Runs the baseline functions multiple times storing outputs and changing the development set"""
@@ -321,7 +346,7 @@ def bootstrapDev(n: int,
 	for i in tqdm(range(n)):
 		# Permuting data
 		train, labels = isolator(resample(dev), showTime = False)
-		fitModels = fitting(methods, train, labels, showTime = False)
+		fitModels = fitting(methods, train, labels, arguments = arguments, showTime = False)
 		predictions[i] = useFitModels(fitModels, validation, showTime = False)
 		scores[i] = applyMetrics(metrics, methods, true, predictions[i], showTime = False)
 	if plot:
@@ -371,6 +396,7 @@ def applyKfold(train: pd.DataFrame,
 			   metrics: Sequence[Callable],
 			   splits: int,
 			   iterations: int,
+			   arguments: list | None = None,
 			   plot: bool = True,
 			   verbose: bool = False) -> np.ndarray:
 	"""This function takes the baseline and applies a k fold cross validation protocol to it"""
@@ -392,7 +418,7 @@ def applyKfold(train: pd.DataFrame,
 		x = train.iloc[holder[0]]
 		val = train.iloc[holder[1]]
 		preds = labels.iloc[holder[0]]
-		models = fitting(methods, x, preds, showTime = False)
+		models = fitting(methods, x, preds, arguments = arguments, showTime = False)
 		results = useFitModels(models, val, showTime = False)
 		scores[index - 1] = applyMetrics(metrics, methods, labels.iloc[holder[1]], results, showTime = False)
 	if plot:
@@ -553,6 +579,39 @@ def compareKfold(data: np.ndarray, compare: np.ndarray) -> np.ndarray:
 	return output
 
 @timeit
+def visualiseComparedBootstrap(preds: tuple,
+							   methods: Sequence[Callable],
+							   metrics: Sequence[Callable],
+							   verbose: bool = False) -> None:
+	"""Takes the output of bootstrapBaseline and plots it"""
+	predictions = preds[0]
+	scores = preds[1]
+	holder = len(methods)
+	# Predictions segment
+	fig, ax = plt.subplots(nrows=1, ncols=holder, figsize=(5*holder, 7*holder), sharey = True)
+	for index in range(holder):
+		ax[index].boxplot(predictions[:, index, :], showmeans=True, meanline=True, sym = '.')
+		ax[index].set_title(f"Method: {methods[index]().__class__.__name__}")
+		ax[index].grid(axis = 'y')
+	ax[0].set_ylabel('Predicted BMI')
+	plt.show()
+	if verbose:
+		print(predictions)
+	# Scores segment
+	temp = len(metrics)
+	fig, ax = plt.subplots(nrows=holder, ncols=temp, figsize=(6*holder, 4*temp), sharey = True)
+	for i in range(temp): # Should iterate input col
+		for index in range(holder): # Should iterate input row
+			ax[index, i].boxplot(scores[i, index, :], showmeans=True, meanline=True, sym = '.') # index, i is row, col in matplotlib
+			ax[index, i].set_title(f"Metric: {metrics[i].__name__}") # Funciton are first class objects in python so __name__ just returns the function name string
+			ax[index, i].grid()
+			ax[index, i].set_ylabel(f'{metrics[i].__name__} Value')
+			ax[index, i].set_xlabel(f'Method: {methods[index].__name__}')
+	plt.show()
+	if verbose:
+		print(scores)
+
+@timeit
 def visualiseComparedKfold(data: np.ndarray, methods: Sequence[Callable], metrics: Sequence[Callable]) -> None:
 	"""Plots the compareKfold function output"""
 	holder = len(methods)
@@ -566,6 +625,87 @@ def visualiseComparedKfold(data: np.ndarray, methods: Sequence[Callable], metric
 			ax[index, i].set_ylabel(f'{metrics[i].__name__} Value')
 			ax[index, i].set_xlabel(f'Method: {methods[index].__name__}')
 	plt.show()
+
+@timeit
+def optimizeSVR(metric: Callable,
+				train: pd.DataFrame,
+				preds: pd.DataFrame,
+				val: pd.DataFrame,
+				truth: pd.DataFrame,
+				trials: int = 100) -> dict:
+	"""Returns the constructed SVR class instance after initializing it with the hyperparameter tuning"""
+	def objective(trial: optuna.trial.Trial,
+			   metric: Callable = metric,
+			   train: pd.DataFrame = train,
+			   preds: pd.DataFrame = preds,
+			   val: pd.DataFrame = val,
+			   truth: pd.DataFrame = truth) -> float:
+		"""Defines an objective to optimize"""
+		c = trial.suggest_float('C', 0.1, 10.0)
+		gamma = trial.suggest_categorical('gamma', ['auto', 'scale'])
+		epsilon = trial.suggest_float('epsilon', 0.01, 1.0)
+		kernel = trial.suggest_categorical('kernel', ['linear', 'poly', 'rbf'])
+		degree = trial.suggest_int('degree', 2, 5)
+		coef = trial.suggest_float('coef0', 0.0, 1.0)
+		model = SVR(C=c, kernel=kernel, degree=degree, coef0=coef, gamma=gamma, epsilon=epsilon)
+		model.fit(train, preds)
+		output = model.predict(val)
+		return metric(output, truth)
+	study = optuna.create_study()
+	study.optimize(objective, n_trials = trials)
+	return study.best_params
+
+@timeit
+def optimizeRidge(metric: Callable,
+				train: pd.DataFrame,
+				preds: pd.DataFrame,
+				val: pd.DataFrame,
+				truth: pd.DataFrame,
+				trials: int = 100) -> dict:
+	"""Returns the constructed BayesianRidge class instance after initializing it with the hyperparameter tuning"""
+	def objective(trial: optuna.trial.Trial,
+			   metric: Callable = metric,
+			   train: pd.DataFrame = train,
+			   preds: pd.DataFrame = preds,
+			   val: pd.DataFrame = val,
+			   truth: pd.DataFrame = truth) -> float:
+		"""Defines an objective to optimize"""
+		alpha1 = trial.suggest_float('alpha_1', 1e-08, 1e-04)
+		alpha2 = trial.suggest_float('alpha_2', 1e-08, 1e-04) 
+		l1 = trial.suggest_float('lambda_1', 1e-08, 1e-04) 
+		l2 = trial.suggest_float('lambda_2', 1e-08, 1e-04) 
+		model = BayesianRidge(alpha_1=alpha1, alpha_2=alpha2, lambda_1=l1, lambda_2=l2)
+		model.fit(train, preds)
+		output = model.predict(val)
+		return metric(output, truth)
+	study = optuna.create_study()
+	study.optimize(objective, n_trials = trials)
+	return study.best_params
+
+@timeit
+def optimizeNet(metric: Callable,
+				train: pd.DataFrame,
+				preds: pd.DataFrame,
+				val: pd.DataFrame,
+				truth: pd.DataFrame,
+				trials: int = 100) -> dict:
+	"""Returns the constructed ElasticNet class instance after initializing it with the hyperparameter tuning"""
+	def objective(trial: optuna.trial.Trial,
+			   metric: Callable = metric,
+			   train: pd.DataFrame = train,
+			   preds: pd.DataFrame = preds,
+			   val: pd.DataFrame = val,
+			   truth: pd.DataFrame = truth) -> float:
+		"""Defines an objective to optimize"""
+		alpha = trial.suggest_float('alpha', 0.1, 10.0)
+		l1 = trial.suggest_float('l1_ratio', 0.0, 1.0)
+		model = ElasticNet(alpha = alpha, l1_ratio = l1, random_state  = 42)
+		model.fit(train, preds)
+		output = model.predict(val)
+		return metric(output, truth)
+	study = optuna.create_study()
+	study.optimize(objective, n_trials = trials)
+	return study.best_params
 
 def main():
 	"""Checks that things work"""
