@@ -20,7 +20,7 @@ import joblib
 from sklearn.decomposition import PCA
 from mpl_toolkits.mplot3d import Axes3D
 import optuna
-from sklearn.cluster import KMeans
+from sklearn.cluster import k_means
 
 
 def timeit(func: Callable) -> Callable:
@@ -709,13 +709,55 @@ def optimizeNet(metric: Callable,
 	return study.best_params
 
 @timeit
-def findClusters(data: pd.DataFrame, inits: int = 10, maxclust: int = 10) -> list:
+def findClusters(data: pd.DataFrame, maxclust: int = 10) -> None:
 	"""Finds the number of clusters in the data by using k means with point representatives"""
-	output = [0] * maxclust
-	for n in range(maxclust):
-		holder = KMeans(n_clusters = n, n_init = inits, random_state = 42)
-		output[n] = holder.fit(data.values)
-	return output
+	# Looking at the documentation we see the output of k_means is a 3 tuple with centroid, label, inertia
+	# We are interested in the inertia since it is the cost function value
+	output = np.array([0.0] * (maxclust - 1))
+	for n in range(1, maxclust):
+		output[n - 1] = k_means(data.values.reshape(-1, 1), n_clusters = n, random_state = 42)[2] # [2] is the last element i.e. inertia
+	# Ploting
+	fig, ax = plt.subplots()
+	ax.plot(range(1, maxclust), output)
+	ax.grid()
+	ax.set_title('Number of cluster\'s effect on the cost function')
+	ax.set_xlabel('Number of clusters')
+	ax.set_ylabel('Cost function (J) value')
+	plt.show()
+
+@timeit
+def applyKmeans(data: pd.DataFrame, clusters: int = 3) -> tuple:
+	"""Returns the cluster representatives and the labels for each data vector"""
+	clusterRepresentatives = np.array([
+		[0.0] * clusters, # clusters
+	])
+	labels = np.array([
+		[0.0] * data.shape[0]
+	])
+	clustering = k_means(data.values.reshape(-1, 1), n_clusters = clusters, random_state = 42)
+	clusterRepresentatives = clustering[0]
+	labels = clustering[1]
+	return clusterRepresentatives, labels
+
+@timeit
+def plotKmeans(data: pd.DataFrame, mClustering: tuple, colors = ['red', 'green', 'blue']) -> None:
+	"""doc"""
+	rep = mClustering[0]
+	labels = mClustering[1]
+	y = 1 # We get to set it for visibility on the plot
+	# Data vectors first since we want to  see the cluser representatives ontop
+	fig, ax = plt.subplots()
+	for label, col in zip(range(len(rep)), colors):
+		points = data.values[labels == label]
+		ax.scatter(points, [y] * len(points), color = col, marker = '.', label = f'Cluster {label}') 
+	# Cluster representative
+	ax.scatter(rep, [y] * len(rep), color = 'orange', marker = (5,1), label = 'Representatives')
+	ax.grid()
+	ax.legend()
+	ax.set_title('Representation of our clusters in 1D')
+	ax.set_xlabel('BMI')
+	ax.set_ylabel('')
+	plt.show()
 
 def main():
 	"""Checks that things work"""
