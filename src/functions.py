@@ -10,6 +10,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from collections.abc import Callable
 from time import time
+from scipy.linalg import dft
 from sklearn.linear_model import BayesianRidge, ElasticNet
 from sklearn.svm import SVR
 from sklearn.utils import resample
@@ -741,17 +742,50 @@ def applyKmeans(data: pd.DataFrame, clusters: int = 3) -> tuple:
 
 @timeit
 def plotKmeans(data: pd.DataFrame, mClustering: tuple, colors = ['red', 'green', 'blue']) -> None:
-	"""doc"""
+	"""Takes the output of the applykmeans function and plots the clusters with different colors"""
 	rep = mClustering[0]
 	labels = mClustering[1]
 	y = 1 # We get to set it for visibility on the plot
 	# Data vectors first since we want to  see the cluser representatives ontop
-	fig, ax = plt.subplots()
+	fig, ax = plt.subplots(figsize = (10, 10))
 	for label, col in zip(range(len(rep)), colors):
 		points = data.values[labels == label]
 		ax.scatter(points, [y] * len(points), color = col, marker = '.', label = f'Cluster {label}') 
 	# Cluster representative
 	ax.scatter(rep, [y] * len(rep), color = 'orange', marker = (5,1), label = 'Representatives')
+	ax.grid()
+	ax.legend()
+	ax.set_title('Representation of k-means clusters in 1D')
+	ax.set_xlabel('BMI')
+	ax.set_ylabel('')
+	plt.show()
+
+@timeit
+def plotDbscan(data: pd.DataFrame, labels: np.ndarray, colors: list = ['red', 'green', 'blue']) -> None:
+	"""Takes the output of the sklearn.cluster.dbscan function and plots the clusters with different colors"""
+	y = 1
+	fig, ax = plt.subplots(figsize = (10, 10))
+	# noise
+	ax.scatter(data.values[labels == -1], [y] * len(data.values[labels == -1]), color = 'black', marker = '+', label = f'Noise')
+	# points
+	for label, col in zip(range(10), colors):
+		points = data.values[labels == label]
+		ax.scatter(points, [y] * len(points), color = col, marker = '.', label = f'Cluster {label}') 
+	ax.grid()
+	ax.legend()
+	ax.set_title('Representation of our clusters in 1D for DBSCAN')
+	ax.set_xlabel('BMI')
+	ax.set_ylabel('')
+	plt.show()
+
+@timeit
+def plotHierarchical(data: pd.DataFrame, labels: np.ndarray, colors = ['red', 'blue', 'green']) -> None:
+	"""Simple ploting of data to labels with colors, nothing is exclusive to the hierarchical algorithms themselves"""
+	y = 1
+	fit, ax = plt.subplots(figsize = (10, 10))
+	for label, col in zip(range(10), colors):
+		points = data.values[labels == label]
+		ax.scatter(points, [y] * len(points), color = col, marker = '.', label = f'Cluster {label}')
 	ax.grid()
 	ax.legend()
 	ax.set_title('Representation of our clusters in 1D')
