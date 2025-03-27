@@ -12,7 +12,9 @@ from collections.abc import Callable
 from time import time
 from scipy.linalg import dft
 from sklearn.linear_model import BayesianRidge, ElasticNet
-from sklearn.svm import SVR
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.svm import SVR, SVC
+from sklearn.naive_bayes import GaussianNB
 from sklearn.utils import resample
 from typing import Any
 from tqdm import tqdm
@@ -48,10 +50,10 @@ def dataSplit(dataframe: pd.DataFrame) -> tuple:
 	return data, metadata
 
 @timeit
-def isolator(data: pd.DataFrame) -> tuple:
+def isolator(data: pd.DataFrame, keyword: str = 'BMI') -> tuple:
 	"""Isolates the x's and y's of the dataframe into different variables"""
-	x = data.drop(columns = ['BMI']) # everything other than the BMI
-	y = data['BMI']
+	x = data.drop(columns = [keyword]) # everything other than the BMI
+	y = data[keyword]
 	return x, y
 
 @timeit
@@ -60,7 +62,7 @@ def regressions(methods: Sequence[Callable],
 				pred: pd.DataFrame,
 				val: pd.DataFrame,
 				arguments: list | None = None) -> np.ndarray:
-	"""Calls the method on the data given and return outputs"""
+	"""Calls the method on the data given and returns outputs"""
 	# for no re computations
 	scale = len(methods)
 	# Variable to keep outputs
@@ -101,7 +103,8 @@ def regressions(methods: Sequence[Callable],
 def applyMetrics(metrics: Sequence[Callable],
 				 options: Sequence[Callable],
 				 truth: np.ndarray,
-				 data: np.ndarray) -> np.ndarray:
+				 data: np.ndarray,
+				 arguments: list | None = None) -> np.ndarray:
 	"""Applies all the given metrics to the data assuming as ground truth the truth given"""
 	# Note that the function takes input as numpy array and not a dataframe which is why we convert the input in the notebook in the ()'s of the function
 	# The options are the regressors the metrics are the cost functions
@@ -122,9 +125,17 @@ def applyMetrics(metrics: Sequence[Callable],
 	# [...], # ...3
 	# [...], # ...4
 	# ...]
-	for i, metric in enumerate(metrics):
-		for index in range(holder):
-			output[i, index] = metric(truth, data[index])
+	if arguments:
+		i = 0
+		for metric, args in zip(metrics , arguments):
+			for index in range(holder):
+				output[i, index] = metric(truth, data[index], **args)
+			i += 1
+		del i
+	else:
+		for i, metric in enumerate(metrics):
+			for index in range(holder):
+				output[i, index] = metric(truth, data[index])
 	return output
 
 @timeit
@@ -138,7 +149,7 @@ def visualisePredictions(input: np.ndarray,
 	holder = len(methods)
 	fig, ax = plt.subplots(nrows=1, ncols=holder, figsize=(3*holder, 3*holder), sharey = True)
 	for index in range(holder):
-		ax[index].boxplot(input[index], showmeans=True, meanline=True, notch=True, sym = '.')
+		ax[index].boxplot(input[index], showmeans=True, meanline=True, sym = '.')
 		ax[index].set_title(f"Method: {methods[index]().__class__.__name__}")
 		ax[index].grid()
 	ax[0].set_ylabel('Predicted BMI')
@@ -399,6 +410,7 @@ def applyKfold(train: pd.DataFrame,
 			   splits: int,
 			   iterations: int,
 			   arguments: list | None = None,
+			   metarguments: list | None = None,
 			   plot: bool = True,
 			   verbose: bool = False) -> np.ndarray:
 	"""This function takes the baseline and applies a k fold cross validation protocol to it"""
@@ -422,7 +434,7 @@ def applyKfold(train: pd.DataFrame,
 		preds = labels.iloc[holder[0]]
 		models = fitting(methods, x, preds, arguments = arguments, showTime = False)
 		results = useFitModels(models, val, showTime = False)
-		scores[index - 1] = applyMetrics(metrics, methods, labels.iloc[holder[1]], results, showTime = False)
+		scores[index - 1] = applyMetrics(metrics, methods, labels.iloc[holder[1]], results, arguments = metarguments, showTime = False)
 	if plot:
 		holder = len(methods)
 		temp = len(metrics)
@@ -635,7 +647,7 @@ def optimizeSVR(metric: Callable,
 				val: pd.DataFrame,
 				truth: pd.DataFrame,
 				trials: int = 100) -> dict:
-	"""Returns the constructed SVR class instance after initializing it with the hyperparameter tuning"""
+	"""Returns SVR class hyperparameters after tuning"""
 	def objective(trial: optuna.trial.Trial,
 			   metric: Callable = metric,
 			   train: pd.DataFrame = train,
@@ -664,7 +676,7 @@ def optimizeRidge(metric: Callable,
 				val: pd.DataFrame,
 				truth: pd.DataFrame,
 				trials: int = 100) -> dict:
-	"""Returns the constructed BayesianRidge class instance after initializing it with the hyperparameter tuning"""
+	"""Returns BayesianRidge class hyperparameters after tuning"""
 	def objective(trial: optuna.trial.Trial,
 			   metric: Callable = metric,
 			   train: pd.DataFrame = train,
@@ -691,7 +703,7 @@ def optimizeNet(metric: Callable,
 				val: pd.DataFrame,
 				truth: pd.DataFrame,
 				trials: int = 100) -> dict:
-	"""Returns the constructed ElasticNet class instance after initializing it with the hyperparameter tuning"""
+	"""Returns ElasticNet class hyperparameters after tuning"""
 	def objective(trial: optuna.trial.Trial,
 			   metric: Callable = metric,
 			   train: pd.DataFrame = train,
@@ -792,6 +804,146 @@ def plotHierarchical(data: pd.DataFrame, labels: np.ndarray, colors = ['red', 'b
 	ax.set_xlabel('BMI')
 	ax.set_ylabel('')
 	plt.show()
+
+@timeit
+def classifications(methods: np.ndarray, train: pd.DataFrame, pred: pd.DataFrame, val: pd.DataFrame, arguments: list | None = None) -> np.ndarray:
+	"""Calls the method on the data given and returns outputs"""
+	scale = len(methods)
+	predictions = np.array(
+		[
+			np.zeros(
+				val.shape[0]
+			)
+		] * scale
+	)
+	if arguments:
+		index = 0
+		for model, args in zip(methods, arguments):
+			object = model(**args)
+			object.fit(train,pred)
+			predictions[index] = object.predict(val)
+			index +=1
+	else:
+		for index, model in enumerate(methods):
+			object = model()
+			object.fit(train, pred)
+			predictions[index] = object.predict(val)
+	return predictions
+
+@timeit
+def classificationMetrics(metrics: Sequence[Callable],
+						  options: Sequence[Callable],
+						  truth: np.ndarray,
+						  data: np.ndarray,
+						  arguments: list | None = None) -> np.ndarray:
+	"""Applies all the given metrics to the data assuming as ground truth the truth given"""
+	holder = len(options)
+	output = np.array(
+		[
+			[
+				[0]
+			] * holder
+		] * len(metrics)
+	)
+	if arguments:
+		i = 0
+		for metric, args in zip(metrics , arguments):
+			for index in range(holder):
+				output[i, index] = metric(truth, data[index], **args)
+			i += 1
+		del i
+	else:
+		for i, metric in enumerate(metrics):
+			for index in range(holder):
+				output[i, index] = metric(truth, data[index])
+	return output
+
+# Take a good look below and tell me its all ok
+
+@timeit
+def optimizeSvc(metric: Callable,
+				train: pd.DataFrame,
+				preds: pd.DataFrame,
+				val: pd.DataFrame,
+				truth: pd.DataFrame,
+				arguments: dict | None = None,
+				trials: int = 100) -> dict:
+	"""Returns SVC class hyperparameters after tuning"""
+	def objective(trial: optuna.trial.Trial,
+			   metric: Callable = metric,
+			   train: pd.DataFrame = train,
+			   preds: pd.DataFrame = preds,
+			   val: pd.DataFrame = val,
+			   truth: pd.DataFrame = truth,
+			   arguments: dict | None = arguments) -> float:
+		"""Defines an objective to optimize"""
+		c = trial.suggest_float('C', 0.1, 10.0)
+		gamma = trial.suggest_categorical('gamma', ['auto', 'scale'])
+		kernel = trial.suggest_categorical('kernel', ['linear', 'poly', 'rbf'])
+		degree = trial.suggest_int('degree', 2, 5)
+		coef = trial.suggest_float('coef0', 0.0, 1.0)
+		model = SVC(C=c, kernel=kernel, degree=degree, coef0=coef, gamma=gamma)
+		model.fit(train, preds)
+		output = model.predict(val)
+		return metric(output, truth, **arguments)
+	study = optuna.create_study()
+	study.optimize(objective, n_trials = trials)
+	return study.best_params
+
+@timeit
+def optimizeKNN(metric: Callable,
+				train: pd.DataFrame,
+				preds: pd.DataFrame,
+				val: pd.DataFrame,
+				truth: pd.DataFrame,
+				arguments: dict | None = None,
+				trials: int = 100) -> dict:
+	"""Returns KNN class hyperparameters after tuning"""
+	def objective(trial: optuna.trial.Trial,
+			   metric: Callable = metric,
+			   train: pd.DataFrame = train,
+			   preds: pd.DataFrame = preds,
+			   val: pd.DataFrame = val,
+			   truth: pd.DataFrame = truth,
+			   arguments: dict | None = arguments) -> float:
+		"""Defines an objective to optimize"""
+		k = trial.suggest_int('n_neighbors', 1, 10)
+		leaf = trial.suggest_int('leaf_size', 25, 35)
+		w = trial.suggest_categorical('weights', ['uniform', 'distance'])
+		algo = trial.suggest_categorical('algorithm', ['ball_tree', 'kd_tree', 'brute'])
+		model = KNeighborsClassifier(n_neighbors=k, leaf_size = leaf, weights = w, algorithm = algo)
+		model.fit(train, preds)
+		output = model.predict(val)
+		return metric(output, truth, **arguments)
+	study = optuna.create_study()
+	study.optimize(objective, n_trials = trials)
+	return study.best_params
+
+@timeit
+def optimizeNBC(metric: Callable,
+				train: pd.DataFrame,
+				preds: pd.DataFrame,
+				val: pd.DataFrame,
+				truth: pd.DataFrame,
+				arguments: dict | None = None,
+				trials: int = 100) -> dict:
+	"""Returns Naive Bayes Classifier class hyperparameters after tuning"""
+	def objective(trial: optuna.trial.Trial,
+			   metric: Callable = metric,
+			   train: pd.DataFrame = train,
+			   preds: pd.DataFrame = preds,
+			   val: pd.DataFrame = val,
+			   truth: pd.DataFrame = truth,
+			   arguments: dict | None = arguments) -> float:
+		"""Defines an objective to optimize"""
+		var = trial.suggest_float('var_smoothing', 1e-12, 1e-6)
+		model = GaussianNB(var_smoothing = var)
+		model.fit(train, preds)
+		output = model.predict(val)
+		return metric(output, truth, **arguments)
+	study = optuna.create_study()
+	study.optimize(objective, n_trials = trials)
+	return study.best_params
 
 def main():
 	"""Checks that things work"""
