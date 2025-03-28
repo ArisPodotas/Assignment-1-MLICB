@@ -1,0 +1,180 @@
+\documentclass[12pt, a4paper]{article}
+\usepackage{graphicx}
+\usepackage{pgfplots}
+\usepackage{mathtools}
+\usepackage{fancyhdr}
+\usepackage{multicol}
+\usepackage{cancel}
+\usepackage{geometry}
+\usepackage{listings}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{subfig}
+\usepackage{hyperref}
+\usepackage{float}
+\usepackage{titlesec}
+\usepackage{tikz, pgfplots}
+\usepackage[utf8]{inputenc}
+\usepackage[backend=biber,style=alphabetic,sorting=ynt]{biblatex}
+
+% Requirement libs
+\usetikzlibrary{positioning}
+
+% Options
+\nonstopmode % To make sure that you dont have to press input for each error
+\geometry{top=1in, left = 1in, right = 1in, bottom=1.2in}
+\pgfplotsset{compat=1.18}
+\graphicspath{{./images}}
+\setlength{\columnsep}{0.7cm}
+
+% Metadata
+\addbibresource{citations.bib}
+\author{Aris Podotas}
+\date{}
+
+% Herlink setup
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    filecolor=magenta,
+    urlcolor=cyan,
+    pdftitle={Overleaf Example},
+    pdfpagemode=FullScreen,
+}
+
+% For the code blocks
+\definecolor{codegreen}{rgb}{0.03,0.5,0.03}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{backcolour}{rgb}{0.95,0.95,0.95}
+
+% Code block setup
+\lstdefinestyle{mystyle}{
+    backgroundcolor=\color{backcolour},
+    commentstyle=\color{codegreen},
+    keywordstyle=\color{magenta},
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{codepurple},
+    basicstyle=\ttfamily\footnotesize,
+    breakatwhitespace=false,
+    breaklines=true,
+    captionpos=b,
+    keepspaces=true,
+    numbers=left,
+    numbersep=5pt,
+    showspaces=false,
+    showstringspaces=false,
+    showtabs=false,
+    tabsize=4,
+    escapeinside = {(*}{*)}
+}
+\lstset{style=mystyle}
+
+% My custom headers and margins 
+\pagestyle{fancy}
+\setlength{\headheight}{44pt}
+\setlength{\headsep}{18pt}
+\lhead{\includegraphics[scale = 0.2]{~/Documents/masters/bnw unit.png}}
+\chead{\quad Data Science and Information Technologies Master’s
+National and Kapodistrian University of Athens}
+\rhead{}
+\lfoot{}
+\cfoot{\thepage}
+\rfoot{}
+
+% Start
+\begin{document}
+
+% Custom title page
+\begin{titlepage}
+    \centering
+    {\huge \textbf{Assignment 1}\par}
+    \vspace{0.5cm}
+    {\Large \textbf{Name:} Aris Podotas\par}
+    \vspace{0.5cm}
+    {\large \textbf{University:} National and Kapodistrian University of Athens\par}
+    \vspace{0.5cm}
+    {\large \textbf{Program:} Data Science and Informaion Technologies\par}
+    \vspace{0.5cm}
+    {\large \textbf{Specialization:} Bioinformatics - Biomedical Data\par}
+    \vspace{0.5cm}
+    {\large \textbf{Lesson:} Machine Learning In Computational Biology\par}
+    \vspace{0.5cm}
+    {\large \textbf{Date:} April 2025\par}
+    \tableofcontents
+\end{titlepage}
+
+\begin{multicols}{2}
+    \section{Abstract} \label{sec:abs}
+
+    In recent years the role of the gut microbiome in health \ref{} has been elucidated.
+    \newline
+
+    \section{Introduction} \label{sec:intro}
+
+    In this assignment we try to compare different predictors for \textit{BMI} depending on the prevelance and diversity of the gut microbiome.
+    \newline
+
+    \section{Methods} \label{sec:methods}
+
+    \subsection{Models} \label{subsec:models}
+
+    Three different regressors were used in the analysis.
+    \newline
+
+    Models:
+    \newline
+
+    \begin{enumerate} \label{enm:models}
+        \item Bayesiand Ridge
+        \item Support Vector Regression
+        \item Elastic Net
+    \end{enumerate}
+
+    Models were imported from the \textit{sklearn} library in \textit{Python}.
+    \newline
+
+    \subsection{Evaluation metrics} \label{subsec:metrics}
+
+    The "" were chosen as evaluation metrics. "" because they are listed as mandatory and "" because we have seen the distributions of the pairs of features and we know:
+    \newline
+
+    \begin{enumerate} \label{enm:metricReasons}
+        \item The categorical data is not going to be in the final data, but in the final metadata.
+        \item Some sets of features contain what seem like outliers.
+    \end{enumerate}
+
+    As a result of knowing about outliers a median metric must be included to compare with the non-median metrics. Since all of our data will be of continuous variables we know the set of all possible metrics and the R2 metric is the default.
+    \newline
+
+    \subsection{Confidences}
+
+    $1000$ iteration bootstrapping was done on models for evaluation along with k-fold cross validation. The sklearn library does not contain a bootstrapping function that we can use to call on our models if the model instance object does not already contain a method for bootstrapping, a protocol was written at \href{https://github.com/ArisPodotas/Assignment-1-MLICB/blob/main/src/functions.py}{our source files}.
+    \newline
+
+    All files can be found at \href{https://github.com/ArisPodotas/Assignment-1-MLICB/tree/main}{this repository}.
+    \newline
+
+    \section{Results} \label{sec:res}
+
+    \section{Disclaimer} \label{sec:disc}
+
+    Large language models (LLM's) were used during the assignment.
+
+    \subsection{LLM} \label{subsec:llms}
+
+    Open AI: Chat GPT 4.0
+
+    \subsection{Purpose} \label{subsec:llmUse}
+
+    \begin{enumerate} \label{enm:llm}
+        \item To check ideas, like if the z-scaled data must be zero mean and unit variance (apparently it is) or if it's conditional (or to explain ideas).
+        \item To ask if concepts already exist in some dependency, as was the case for the way we cast the labels of the sex feature in the original data to binary representations (also re-used for the Project ID).
+        \item For acquisition of the relative documentation.
+        \item For helping with the \LaTeX table formating in this report for time efficiency.
+    \end{enumerate}
+
+    \section{Citations} \label{sec:citations}
+\end{multicols}
+
+\end{document}
