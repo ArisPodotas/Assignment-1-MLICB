@@ -646,7 +646,8 @@ def optimizeSVR(metric: Callable,
 				preds: pd.DataFrame,
 				val: pd.DataFrame,
 				truth: pd.DataFrame,
-				trials: int = 100) -> dict:
+				trials: int = 100,
+				extra: bool = False) -> dict:
 	"""Returns SVR class hyperparameters after tuning"""
 	def objective(trial: optuna.trial.Trial,
 			   metric: Callable = metric,
@@ -665,8 +666,12 @@ def optimizeSVR(metric: Callable,
 		model.fit(train, preds)
 		output = model.predict(val)
 		return metric(output, truth)
-	study = optuna.create_study()
-	study.optimize(objective, n_trials = trials)
+	if extra:
+		study = optuna.create_study(sampler=optuna.samplers.GPSampler(), direction='maximize')
+		study.optimize(objective, n_trials = trials)
+	else:
+		study = optuna.create_study()
+		study.optimize(objective, n_trials = trials)
 	return study.best_params
 
 @timeit
@@ -675,7 +680,8 @@ def optimizeRidge(metric: Callable,
 				preds: pd.DataFrame,
 				val: pd.DataFrame,
 				truth: pd.DataFrame,
-				trials: int = 100) -> dict:
+				trials: int = 100,
+				extra: bool = False) -> dict:
 	"""Returns BayesianRidge class hyperparameters after tuning"""
 	def objective(trial: optuna.trial.Trial,
 			   metric: Callable = metric,
@@ -692,8 +698,12 @@ def optimizeRidge(metric: Callable,
 		model.fit(train, preds)
 		output = model.predict(val)
 		return metric(output, truth)
-	study = optuna.create_study()
-	study.optimize(objective, n_trials = trials)
+	if extra:
+		study = optuna.create_study(sampler=optuna.samplers.GPSampler(), direction='maximize')
+		study.optimize(objective, n_trials = trials)
+	else:
+		study = optuna.create_study()
+		study.optimize(objective, n_trials = trials)
 	return study.best_params
 
 @timeit
@@ -702,7 +712,8 @@ def optimizeNet(metric: Callable,
 				preds: pd.DataFrame,
 				val: pd.DataFrame,
 				truth: pd.DataFrame,
-				trials: int = 100) -> dict:
+				trials: int = 100,
+				extra: bool = False) -> dict:
 	"""Returns ElasticNet class hyperparameters after tuning"""
 	def objective(trial: optuna.trial.Trial,
 			   metric: Callable = metric,
@@ -717,8 +728,12 @@ def optimizeNet(metric: Callable,
 		model.fit(train, preds)
 		output = model.predict(val)
 		return metric(output, truth)
-	study = optuna.create_study()
-	study.optimize(objective, n_trials = trials)
+	if extra:
+		study = optuna.create_study(sampler=optuna.samplers.GPSampler(), direction='maximize')
+		study.optimize(objective, n_trials = trials)
+	else:
+		study = optuna.create_study()
+		study.optimize(objective, n_trials = trials)
 	return study.best_params
 
 @timeit
