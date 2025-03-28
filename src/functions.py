@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 from collections.abc import Callable
 from time import time
 from scipy.linalg import dft
-from sklearn.linear_model import BayesianRidge, ElasticNet
+from sklearn.linear_model import BayesianRidge, ElasticNet, LogisticRegression
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import SVR, SVC
 from sklearn.naive_bayes import GaussianNB
@@ -938,6 +938,32 @@ def optimizeNBC(metric: Callable,
 		"""Defines an objective to optimize"""
 		var = trial.suggest_float('var_smoothing', 1e-12, 1e-6)
 		model = GaussianNB(var_smoothing = var)
+		model.fit(train, preds)
+		output = model.predict(val)
+		return metric(output, truth, **arguments)
+	study = optuna.create_study()
+	study.optimize(objective, n_trials = trials)
+	return study.best_params
+
+@timeit
+def optimizeLR(metric: Callable,
+			   train: pd.DataFrame,
+			   preds: pd.DataFrame,
+			   val: pd.DataFrame,
+			   truth: pd.DataFrame,
+			   arguments: dict | None = None,
+			   trials: int = 100) -> dict:
+	"""Returns Logistic Regression class hyperparameters after tuning"""
+	def objective(trial: optuna.trial.Trial,
+			   metric: Callable = metric,
+			   train: pd.DataFrame = train,
+			   preds: pd.DataFrame = preds,
+			   val: pd.DataFrame = val,
+			   truth: pd.DataFrame = truth,
+			   arguments: dict | None = arguments) -> float:
+		"""Defines an objective to optimize"""
+		c = trial.suggest_float('C', 0.1, 2.0)
+		model = LogisticRegression(C = c)
 		model.fit(train, preds)
 		output = model.predict(val)
 		return metric(output, truth, **arguments)
