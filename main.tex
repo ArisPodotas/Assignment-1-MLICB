@@ -202,6 +202,9 @@ National and Kapodistrian University of Athens}
     Figures were generated from the \textit{matplotlib} \cite{noauthor_matplotlib_nodate} library, all implementations are available at \href{https://github.com/ArisPodotas/Assignment-1-MLICB/blob/main/src/functions.py}{our source files}.
     \newline
 
+    In all box plots the dotted green line denotes the mean value and the orange line denotes the median.
+    \newline
+
     \subsection{Data transformations} \label{subsec:transforms}
 
     Categorical values like the \textit{Sex} category were cast to categorical numerical values.
@@ -269,16 +272,75 @@ National and Kapodistrian University of Athens}
         \caption{K-fold cross validation for the chosen baseline model}\label{fig:baselineKfold}
     \end{figure}
 
-    The model of Figure~\ref{fig:baselineBoot}, Figure~\ref{fig:baselineKfold} is in the \href{https://github.com/ArisPodotas/Assignment-1-MLICB/tree/main/models/Baseline}{models} folder under the name [model]\_Baseline\_just\_species.pkl.
+    The models of Figure~\ref{fig:baselineBoot}, Figure~\ref{fig:baselineKfold} is in the \href{https://github.com/ArisPodotas/Assignment-1-MLICB/tree/main/models/Baseline}{models} folder under the name [model]\_Baseline\_just\_species.pkl.
     \newline
 
-    One thing to notice about this baseline model is the upper and lower bound of the predictions it produces evident in Figure~\ref{fig:baselineBoot}. The highest predicted bootstrap iteration is up to $\geq 150$ BMI and the lowest is $\leq -10$. Not only are negative values of the BMI not allowed but values that range $\leq 10$ are very unlikeley to impossible. There is also something evidently wrong with the k-fold cross validation results Figure~\ref{fig:baselineKfold} as the \textit{r2} score is negative which is indicative or poor guessing.
+    One thing to notice about this baseline Bayesian Ridge model is the upper and lower bound of the predictions it produces evident in Figure~\ref{fig:baselineBoot}. The highest predicted bootstrap iteration is up to $\geq 150$ BMI and the lowest is $\leq -10$. Not only are negative values of the BMI not allowed but values that range $\leq 10$ are very unlikeley to impossible. There is also something evidently wrong with the model according to the k-fold cross validation results Figure~\ref{fig:baselineKfold} as the \textit{r2} score is negative which is indicative of poor guessing.
+    \newline
+
+    The other two \textit{regressors} suffer from a seperate problem, one that might render them uniquely worse than the Bayesian ridge, that being that the prediction range is very narrow and misses a large portion of the validation set and even the development set. Their metrics may not be too altered as a result of this since the predictions within range are plentiful and accurate. This is something to keep note of.
+    \newline
 
     \subsection{Feature selection} \label{subsec:fs}
 
+    A function to compare the evaluation metrics of two consecutive models has been written in \href{https://github.com/ArisPodotas/Assignment-1-MLICB/blob/main/src/functions.py}{our source files} for a more analytical comparison of the steps we take. The funciton takes two distributions of evaluation metrics and calculates the difference of the two distributions, resulting in one final distribution. This final output will be a $0$ mean unit variance Gaussin should there be no difference between the two models.
+    \newline
+
+    Feature selected model predictions:
+    \newline
+
+    \begin{figure}[H]
+        \begin{center}
+            \includegraphics[width=0.45\textwidth]{./images/fs no metadata default run bootstrap both predictions.png}
+        \end{center}
+        \caption{Bootstraping predictions for both the development and the validation set of the feature selected model}\label{fig:fsboot}
+    \end{figure}
+
+    Evaluation metrics:
+
+    \begin{figure}[H]
+        \begin{center}
+            \includegraphics[width=0.45\textwidth]{./images/fs no metadata default run bootstrap KFOLD.png}
+        \end{center}
+        \caption{K-fold cross validation for the feature selected model}\label{fig:fskfold}
+    \end{figure}
+
+    We will not show the difference of Gaussians here for brevity's sake, one can browse extra materials at \href{https://github.com/ArisPodotas/Assignment-1-MLICB/blob/main/notebooks/model_analysis.ipynb}{our notebooks}.
+    \newline
+
+    These results have better consistency when it comes to the bounds of the predictons (the maximum and minimum prediction of all models but mainly the Bayesian ridge). The evaluation metrics imply that this is not just a visual difference but that the models have performed better on the data once their inputs have been processed with a feature selection method \ref{subsec:fselect}. The difference is not substantial but it is notable. One thing to notice is that the upper predictions is the one that has changed the most from the previous models. There is a tendency thus far to predict lower values rather than higher ones. This time we miss the highest BMI (being $60$) in the validation set in the prediction range. This is something that cannot be helped since the data point in question is of low representation and only in the validation set.
+    \newline
+
+    Now that the bounds of all models are shorter we can see that the Elastic net seems to be on average not capturing the distribution properly but is sometimes (some bootstrap iterations) capturing the actual range of the dev set on the lower bound.
+    \newline
+
     \subsection{Hyper parameter optimization} \label{subsec:hyperopt}
 
-    \subsection{Winner} \label{subsec:winner}
+    Feature selected hyper parameter optimized predictions:
+
+    \begin{figure}[H]
+        \begin{center}
+            \includegraphics[width=0.45\textwidth]{./images/hyper no metadata default run bootstrap both predictions.png}
+        \end{center}
+        \caption{Bootstraping predictions for both the development and the validation set of the feature selected optimized model}\label{fig:finalboot}
+    \end{figure}
+
+    Feature selected hyper parameter optimized evaluations:
+
+    \begin{figure}[H]
+        \begin{center}
+            \includegraphics[width=0.45\textwidth]{./images/hyper no metadata default run bootstrap KFOLD.png}
+        \end{center}
+        \caption{K-fold cross validation for the chosen feature selected optimized model}\label{fig:finalkfold}
+    \end{figure}
+
+    The Bayesian ridge does not seem to have been affected by the optimization parameter change. The other two models seem to have even more narrow distribution around the mean of their predictions after the optimization. The metrics have improved but when choosing a best model the distribution range of all prediciton outputs cannot be ignored and for that reason the Bayesian ridge has been chosen as the "Winner" model form the analysis. The improvements of the metrics as minor, as they were in the feature selection \ref{subsec:fs}.
+    \newline
+
+    \section{Conclusions} \label{sec:conc}
+
+    Our final "winner" model seems to have a good distribution of it's predictions for the training set that was used, it's metrics leave something to be desired however considering that each step did not improove them much. Seeing as the \textit{r2} score is negative we cannot say that this model does "good" predicitons. It would seem that this problem is not solvable to a satisfying degree with the given data that has been offered as of this assignment.
+    \newline
 
     \section{Disclaimer} \label{sec:disc}
 
