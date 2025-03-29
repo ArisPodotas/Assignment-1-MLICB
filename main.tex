@@ -107,19 +107,23 @@ National and Kapodistrian University of Athens}
 \begin{multicols}{2}
     \section{Abstract} \label{sec:abs}
 
-    In recent years the role of the gut microbiome in health \ref{} has been elucidated.
+    In recent years the role of the gut microbiome in health \cite{} has been elucidated.
     \newline
 
     \section{Introduction} \label{sec:intro}
 
-    In this assignment we try to compare different predictors for \textit{BMI} depending on the prevelance and diversity of the gut microbiome.
+    In this assignment we try to compare different \textit{regressors} for \textit{BMI} depending on the prevelance of and diversity of species of the gut microbiome.
     \newline
 
     \section{Methods} \label{sec:methods}
 
+    \subsection{Implementation} \label{subsec:impl}
+
+    All results were created in the \textit{Python} programming language \cite{noauthor_3132_nodate}.
+
     \subsection{Models} \label{subsec:models}
 
-    Three different regressors were used in the analysis.
+    Three different \textit{regressors} were used in the analysis.
     \newline
 
     Models:
@@ -131,25 +135,39 @@ National and Kapodistrian University of Athens}
         \item Elastic Net
     \end{enumerate}
 
-    Models were imported from the \textit{sklearn} library in \textit{Python}.
+    Models were imported from the \textit{sklearn} \cite{noauthor_scikit-learn_nodate} library in \textit{Python} \cite{noauthor_3132_nodate}.
     \newline
 
     \subsection{Evaluation metrics} \label{subsec:metrics}
 
-    The "" were chosen as evaluation metrics. "" because they are listed as mandatory and "" because we have seen the distributions of the pairs of features and we know:
+    Four evaluation metrics were chosen
+    \newline
+
+    \begin{enumerate} \label{enm:metrics}
+        \item Root mean squared error
+        \item Mean absolute error
+        \item R2 score
+        \item Median absolute error
+    \end{enumerate}
+
+    The Root mean squared error, Mean absolute error, R2 score were chosen as evaluation metrics because they are listed as mandatory and the Median absolute error because we have seen the distributions of the pairs of features and we know:
     \newline
 
     \begin{enumerate} \label{enm:metricReasons}
         \item The categorical data is not going to be in the final data, but in the final metadata.
         \item Some sets of features contain what seem like outliers.
+        \item We have no median based metric till now to compensate
     \end{enumerate}
 
-    As a result of knowing about outliers a median metric must be included to compare with the non-median metrics. Since all of our data will be of continuous variables we know the set of all possible metrics and the R2 metric is the default.
+    As a result of knowing about outliers a median metric must be included to compare with the non-median metrics.
     \newline
 
-    \subsection{Confidences}
+    \subsection{Confidences} \label{subsec:conf}
 
-    $1000$ iteration bootstrapping was done on models for evaluation along with k-fold cross validation. The sklearn library does not contain a bootstrapping function that we can use to call on our models if the model instance object does not already contain a method for bootstrapping, a protocol was written at \href{https://github.com/ArisPodotas/Assignment-1-MLICB/blob/main/src/functions.py}{our source files}.
+    $1000$ iteration \textit{bootstrapping} was done on models for evaluation along with repeated \textit{k-fold cross validation} for $50$ folds, $20$ iterations.
+    \newline
+
+    The \textit{sklearn} library \cite{noauthor_scikit-learn_nodate} does not contain a \textit{bootstrapping} function that we can use to call on our models. A protocol was written at \href{https://github.com/ArisPodotas/Assignment-1-MLICB/blob/main/src/functions.py}{our source files}.
     \newline
 
     All files can be found at \href{https://github.com/ArisPodotas/Assignment-1-MLICB/tree/main}{this repository}.
@@ -163,7 +181,7 @@ National and Kapodistrian University of Athens}
 
     \subsection{LLM} \label{subsec:llms}
 
-    Open AI: Chat GPT 4.0
+    Open AI: Chat GPT 4.0 \cite{}
 
     \subsection{Purpose} \label{subsec:llmUse}
 
@@ -175,6 +193,10 @@ National and Kapodistrian University of Athens}
     \end{enumerate}
 
     \section{Citations} \label{sec:citations}
+
+    \bibliographystyle{apacite}
+    \bibliography{citations}
+
 \end{multicols}
 
 \end{document}

@@ -8,3 +8,7 @@ I like to write Python code as if I am writing a non interpreted language as far
 
 All links to websites other than the github repository the assignment is implemented in will be of the url. All links of materials from within the github repository will use relative paths, should these relative paths not be suppoerted in the in browser version of the assignment on github they should work once the repository has been cloned locally.
 
+# Repository branches
+
+It was suggested we use a Linux based machine for the assignment, I have two machines that I work with and one is Linux based the other is Windows based so the two branches are for the seperate machines.
+
