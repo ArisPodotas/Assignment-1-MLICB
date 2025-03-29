@@ -10,7 +10,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 from collections.abc import Callable
 from time import time
-from scipy.linalg import dft
 from sklearn.linear_model import BayesianRidge, ElasticNet, LogisticRegression
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import SVR, SVC
@@ -988,6 +987,7 @@ def optimizeLR(metric: Callable,
 
 def main():
 	"""Checks that things work"""
+	optimizeLR()
 	pass
 
 if __name__ == "__main__":

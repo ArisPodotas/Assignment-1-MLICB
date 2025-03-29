@@ -16,7 +16,6 @@
 \usepackage{tikz, pgfplots}
 \usepackage[utf8]{inputenc}
 \usepackage[backend=biber,style=apa]{biblatex}
-\addbibresource{citations.bib}
 
 % Requirement libs
 \usetikzlibrary{positioning}
@@ -29,8 +28,10 @@
 \setlength{\columnsep}{0.7cm}
 
 % Metadata
+\bibliography{./citations.bib}
+\addbibresource{./citations.bib}
 \author{Aris Podotas}
-\date{}
+\date{today}
 
 % Herlink setup
 \hypersetup{
@@ -85,7 +86,6 @@ National and Kapodistrian University of Athens}
 % Start
 \begin{document}
 
-
 % Custom title page
 \begin{titlepage}
     \centering
@@ -95,7 +95,7 @@ National and Kapodistrian University of Athens}
     \vspace{0.5cm}
     {\large \textbf{University:} National and Kapodistrian University of Athens\par}
     \vspace{0.5cm}
-    {\large \textbf{Program:} Data Science and Informaion Technologies\par}
+    {\large \textbf{Program:} Data Science and Information Technologies\par}
     \vspace{0.5cm}
     {\large \textbf{Specialization:} Bioinformatics - Biomedical Data\par}
     \vspace{0.5cm}
@@ -106,14 +106,24 @@ National and Kapodistrian University of Athens}
 \end{titlepage}
 
 \begin{multicols}{2}
-    \section{Abstract} \label{sec:abs}
+    \section*{Abstract} \label{sec:abs}
 
-    In recent years the role of the gut microbiome in health \cite{} has been elucidated.
+    In recent years the role of the gut micro-biome in health has been elucidated \cite{ross_interplay_2024}.
     \newline
 
     \section{Introduction} \label{sec:intro}
 
-    In this assignment we try to compare different \textit{regressors} for \textit{BMI} depending on the prevelance of and diversity of species of the gut microbiome.
+    In this assignment we try to compare different \textit{regressors} for \textit{BMI} depending on the prevalence of and diversity of species of the gut micro-biome.
+    \newline
+
+    \subsection{Body mass index} \label{subsec:bmi}
+
+    The body mass index (BMI) is a metric derived from the mass, weight and height of a person in $\frac{km}{m^2}$. The world health organization (WHO) \cite{noauthor_world_nodate} has an official categorization of different values of the BMI per age group. The BMI can be a useful estimator for ones physical condition and health \cite{armet_rethinking_2022}.
+    \newline
+
+    \subsection{Gut microbiome} \label{subsec:micro}
+
+    The gut microbiome is the sum of populations of microorganisms that live in the digestive track. This term may refer to only the populations on a binary, exists/ does not exist scale but here we refer to it as not only existence but also quantification of populations of microorganisms. The importance of the presence of these colonies has to do with their role in adding elements or altering elements of the sum of all metabolic pathways originating from the digestive track.
     \newline
 
     \section{Methods} \label{sec:methods}
@@ -121,6 +131,7 @@ National and Kapodistrian University of Athens}
     \subsection{Implementation} \label{subsec:impl}
 
     All results were created in the \textit{Python} programming language \cite{noauthor_3132_nodate}.
+    \newline
 
     \subsection{Models} \label{subsec:models}
 
@@ -131,7 +142,7 @@ National and Kapodistrian University of Athens}
     \newline
 
     \begin{enumerate} \label{enm:models}
-        \item Bayesiand Ridge
+        \item Bayesian Ridge
         \item Support Vector Regression
         \item Elastic Net
     \end{enumerate}
@@ -171,10 +182,103 @@ National and Kapodistrian University of Athens}
     The \textit{sklearn} library \cite{noauthor_scikit-learn_nodate} does not contain a \textit{bootstrapping} function that we can use to call on our models. A protocol was written at \href{https://github.com/ArisPodotas/Assignment-1-MLICB/blob/main/src/functions.py}{our source files}.
     \newline
 
+    Three distinct \textit{bootstrap} implementations were assessed.
+    \newline
+
+    \begin{enumerate} \label{enm:bootstrap}
+        \item Only altering the training set
+        \item Only altering the validation set
+        \item Altering both the training and validation set
+    \end{enumerate}
+
+    For all models all three were used.
+    \newline
+
     All files can be found at \href{https://github.com/ArisPodotas/Assignment-1-MLICB/tree/main}{this repository}.
     \newline
 
+    \subsection{Figures} \label{subsec:figs}
+
+    Figures were generated from the \textit{matplotlib} \cite{noauthor_matplotlib_nodate} library, all implementations are available at \href{https://github.com/ArisPodotas/Assignment-1-MLICB/blob/main/src/functions.py}{our source files}.
+    \newline
+
+    \subsection{Data transformations} \label{subsec:transforms}
+
+    Categorical values like the \textit{Sex} category were cast to categorical numerical values.
+    \newline
+
+    Since the data was not z-scale normalized a z-scale normalization was done on the micro-organism colonies.
+    \newline
+
+    \subsection{Feature selection} \label{subsec:fselect}
+
+    Columns such as \textit{Host age} were removed from the final data before baselines were established
+    \newline
+
+    List of removed features:
+    \newline
+
+    \begin{enumerate} \label{enm:colms}
+        \item Unamed 0
+        \item Experiment type
+        \item Disease Mesh ID
+    \end{enumerate}
+
+    Then the features:
+    \newline
+
+    \begin{enumerate} \label{enm:metadata}
+        \item Project ID
+        \item Sex
+        \item Host age
+    \end{enumerate}
+
+    Were considered metadata for our models and a baseline was created with these in mind as was without them.
+    \newline
+
+    Once the baseline was established the feature selected models used a principal component analysis to keep $95\%$ of the total variance. This left only $95$ features in the dataset.
+    \newline
+
+    \subsection{Hyper parameter optimization} \label{subsec:optuna}
+
+    The library \textit{optuna} \cite{noauthor_optuna_nodate} was used to search for model best parameters.
+    \newline
+
     \section{Results} \label{sec:res}
+
+    We will only focus on the baseline model that was chosen after all the different baselines were evaluated, since multiple baseline models using the metadata as it was deemed (\ref{subsec:fselect}) were constructed. For more reading on the baseline models that were not chosen and used here reference the \href{https://github.com/ArisPodotas/Assignment-1-MLICB/blob/main/notebooks/model_analysis.ipynb}{source files}.
+    \newline
+
+    \subsection{Baseline} \label{subsec:baseline}
+
+    Baseline predictions:
+
+    \begin{figure}[H]
+        \begin{center}
+            \includegraphics[width=0.45\textwidth]{./images/Baseline no metadata default run bootstrap both predictions.png}
+        \end{center}
+        \caption{Bootstraping predictions for both the development and the validation set of the baseline model}\label{fig:baselineBoot}
+    \end{figure}
+
+    Our baseline evaluation metrics:
+
+    \begin{figure}[H]
+        \begin{center}
+            \includegraphics[width=0.45\textwidth]{./images/Baseline no metadata default run bootstrap KFOLD.png}
+        \end{center}
+        \caption{K-fold cross validation for the chosen baseline model}\label{fig:baselineKfold}
+    \end{figure}
+
+    The model of Figure~\ref{fig:baselineBoot}, Figure~\ref{fig:baselineKfold} is in the \href{https://github.com/ArisPodotas/Assignment-1-MLICB/tree/main/models/Baseline}{models} folder under the name [model]\_Baseline\_just\_species.pkl.
+    \newline
+
+    One thing to notice about this baseline model is the upper and lower bound of the predictions it produces evident in Figure~\ref{fig:baselineBoot}. The highest predicted bootstrap iteration is up to $\geq 150$ BMI and the lowest is $\leq -10$. Not only are negative values of the BMI not allowed but values that range $\leq 10$ are very unlikeley to impossible. There is also something evidently wrong with the k-fold cross validation results Figure~\ref{fig:baselineKfold} as the \textit{r2} score is negative which is indicative or poor guessing.
+
+    \subsection{Feature selection} \label{subsec:fs}
+
+    \subsection{Hyper parameter optimization} \label{subsec:hyperopt}
+
+    \subsection{Winner} \label{subsec:winner}
 
     \section{Disclaimer} \label{sec:disc}
 
@@ -182,7 +286,7 @@ National and Kapodistrian University of Athens}
 
     \subsection{LLM} \label{subsec:llms}
 
-    Open AI: Chat GPT 4.0 \cite{}
+    Open AI: Chat GPT 4.0 \cite{noauthor_chatgpt_nodate}
 
     \subsection{Purpose} \label{subsec:llmUse}
 
@@ -190,7 +294,7 @@ National and Kapodistrian University of Athens}
         \item To check ideas, like if the z-scaled data must be zero mean and unit variance (apparently it is) or if it's conditional (or to explain ideas).
         \item To ask if concepts already exist in some dependency, as was the case for the way we cast the labels of the sex feature in the original data to binary representations (also re-used for the Project ID).
         \item For acquisition of the relative documentation.
-        \item For helping with the \LaTeX table formating in this report for time efficiency.
+        \item For helping with the \LaTeX table formatting in this report for time efficiency.
     \end{enumerate}
 
     \section{Citations} \label{sec:citations}
