@@ -15,7 +15,8 @@
 \usepackage{titlesec}
 \usepackage{tikz, pgfplots}
 \usepackage[utf8]{inputenc}
-\usepackage[backend=biber,style=alphabetic,sorting=ynt]{biblatex}
+\usepackage[backend=biber,style=apa]{biblatex}
+\addbibresource{citations.bib}
 
 % Requirement libs
 \usetikzlibrary{positioning}
@@ -37,7 +38,7 @@
     linkcolor=blue,
     filecolor=magenta,
     urlcolor=cyan,
-    pdftitle={Overleaf Example},
+    pdftitle={MLICB Assignment 1},
     pdfpagemode=FullScreen,
 }
 
@@ -83,6 +84,7 @@ National and Kapodistrian University of Athens}
 
 % Start
 \begin{document}
+
 
 % Custom title page
 \begin{titlepage}
@@ -193,10 +195,9 @@ National and Kapodistrian University of Athens}
 
     \section{Citations} \label{sec:citations}
 
-    \addbibresource{citations.bib}
-    \bibliographystyle{apacite}
-    \bibliography{citations}
+    \printbibliography
 
 \end{multicols}
 
 \end{document}
+
