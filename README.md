@@ -22,7 +22,7 @@ It was suggested we use a Linux based machine for the assignment, I have two mac
 
 # Final deliverable
 
-The "main.pdf" is the report of the assignment
+The "Report.pdf" is the report of the assignment
 
 The bonus_1.tex, bonus_2.tex are unused and the reports for the bonus questions exist in the notebooks of the bonus questions themselves
 
