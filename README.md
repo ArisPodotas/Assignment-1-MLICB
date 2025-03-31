@@ -20,3 +20,9 @@ All links to websites other than the github repository the assignment is impleme
 
 It was suggested we use a Linux based machine for the assignment, I have two machines that I work with and one is Linux based the other is Windows based so the two branches are for the seperate machines.
 
+# Final deliverable
+
+The "main.pdf" is the report of the assignment
+
+The bonus_1.tex, bonus_2.tex are unused and the reports for the bonus questions exist in the notebooks of the bonus questions themselves
+
